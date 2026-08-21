@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30,6 +31,16 @@
     text-shadow: 2px 2px 4px black;
     margin-bottom: 20px;
   }
+  #startContent {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  #startCharacter {
+    height: 120px;
+    width: auto;
+    pointer-events: none;
+  }
   #startButton {
     padding: 15px 30px;
     font-size: 1.5em;
@@ -50,7 +61,10 @@
 <!-- Start Screen -->
 <div id="startScreen">
   <h1>Tad's Broken Pictures</h1>
-  <button id="startButton">Start Game</button>
+  <div id="startContent">
+    <img id="startCharacter" src="frog.png" alt="Frog">
+    <button id="startButton">Start Game</button>
+  </div>
 </div>
 
 <!-- Game Canvas -->
@@ -94,6 +108,12 @@
   let timer;
   let timeLeft;
   let puzzleImage = new Image();
+  let pieces = [];
+  let pieceWidth, pieceHeight;
+  let draggingPiece = null;
+  let offsetX, offsetY;
+  let offsetXCenter = 0;
+  let offsetYCenter = 0;
 
   function startLevel(levelIndex) {
     const level = levels[levelIndex];
@@ -119,18 +139,16 @@
     }, 1000);
   }
 
-  // Puzzle state
-  let pieces = [];
-  let pieceWidth, pieceHeight;
-  let draggingPiece = null;
-  let offsetX, offsetY;
-
   function scrambleImage(gridSize) {
     const ctx = document.getElementById('gameCanvas').getContext('2d');
     const canvas = ctx.canvas;
 
-    pieceWidth = canvas.width / gridSize;
-    pieceHeight = canvas.height / gridSize;
+    pieceWidth = Math.floor(canvas.width / (gridSize + 1));
+    pieceHeight = Math.floor(canvas.height / (gridSize + 1));
+
+    // Center offsets
+    offsetXCenter = (canvas.width - (pieceWidth * gridSize)) / 2;
+    offsetYCenter = (canvas.height - (pieceHeight * gridSize)) / 2;
 
     // Create pieces array
     pieces = [];
@@ -164,7 +182,7 @@
       ctx.drawImage(
         puzzleImage,
         p.correctX, p.correctY, pieceWidth, pieceHeight,
-        p.x, p.y, pieceWidth, pieceHeight
+        p.x + offsetXCenter, p.y + offsetYCenter, pieceWidth, pieceHeight
       );
     });
   }
@@ -185,29 +203,53 @@
   function startDrag(e, ctx) {
     const mousePos = getMousePos(ctx.canvas, e);
     draggingPiece = pieces.find(p =>
-      mousePos.x > p.x && mousePos.x < p.x + pieceWidth &&
-      mousePos.y > p.y && mousePos.y < p.y + pieceHeight
+      mousePos.x > p.x + offsetXCenter && mousePos.x < p.x + offsetXCenter + pieceWidth &&
+      mousePos.y > p.y + offsetYCenter && mousePos.y < p.y + offsetYCenter + pieceHeight
     );
     if (draggingPiece) {
-      offsetX = mousePos.x - draggingPiece.x;
-      offsetY = mousePos.y - draggingPiece.y;
+      offsetX = mousePos.x - (draggingPiece.x + offsetXCenter);
+      offsetY = mousePos.y - (draggingPiece.y + offsetYCenter);
     }
   }
 
   function drag(e, ctx) {
     if (!draggingPiece) return;
     const mousePos = getMousePos(ctx.canvas, e);
-    draggingPiece.x = mousePos.x - offsetX;
-    draggingPiece.y = mousePos.y - offsetY;
+    draggingPiece.x = mousePos.x - offsetXCenter - offsetX;
+    draggingPiece.y = mousePos.y - offsetYCenter - offsetY;
     drawPuzzle(ctx);
   }
 
   function endDrag(e, ctx, gridSize) {
     if (!draggingPiece) return;
-    const snapX = Math.round(draggingPiece.x / pieceWidth) * pieceWidth;
-    const snapY = Math.round(draggingPiece.y / pieceHeight) * pieceHeight;
-    draggingPiece.x = snapX;
-    draggingPiece.y = snapY;
+    const mousePos = getMousePos(ctx.canvas, e);
+
+    // Find drop slot
+    const dropCol = Math.floor((mousePos.x - offsetXCenter) / pieceWidth);
+    const dropRow = Math.floor((mousePos.y - offsetYCenter) / pieceHeight);
+
+    if (dropCol >= 0 && dropCol < gridSize && dropRow >= 0 && dropRow < gridSize) {
+      const targetX = dropCol * pieceWidth;
+      const targetY = dropRow * pieceHeight;
+
+      // Find the piece currently in that slot
+      const targetPiece = pieces.find(p => p.x === targetX && p.y === targetY);
+
+      if (targetPiece && targetPiece !== draggingPiece) {
+        // Swap positions
+        const tempX = draggingPiece.x;
+        const tempY = draggingPiece.y;
+        draggingPiece.x = targetPiece.x;
+        draggingPiece.y = targetPiece.y;
+        targetPiece.x = tempX;
+        targetPiece.y = tempY;
+      } else {
+        // Snap to nearest slot
+        draggingPiece.x = targetX;
+        draggingPiece.y = targetY;
+      }
+    }
+
     drawPuzzle(ctx);
     draggingPiece = null;
 
@@ -242,4 +284,3 @@
 
 </body>
 </html>
-
