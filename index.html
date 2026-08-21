@@ -1,3 +1,6 @@
+<!-- =========================
+ PART 1 — HTML & STYLES
+========================= -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -70,6 +73,10 @@
 
 <div id="timerDisplay">Time: 0</div>
 <canvas id="gameCanvas" width="600" height="600"></canvas>
+
+<!-- =========================
+ PART 2 — SOUNDS, LEVELS & REVEAL LOGIC
+========================= -->
 <script>
   // 🎵 Sound effects
   const startSound = new Audio('start.mp3');
@@ -136,7 +143,6 @@
     };
     puzzleImage.src = level.src;
   }
-
   function startTimer() {
     clearInterval(timer);
     timer = setInterval(() => {
@@ -197,7 +203,6 @@
       );
     });
   }
-
   function setupDragAndDrop(ctx, gridSize) {
     const canvas = ctx.canvas;
 
@@ -236,12 +241,13 @@
     if (!draggingPiece) return;
     const mousePos = getMousePos(ctx.canvas, e);
 
-    // Redraw puzzle without dragged piece
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    const ctxCanvas = ctx.canvas;
+    ctx.clearRect(0, 0, ctxCanvas.width, ctxCanvas.height);
+
+    // Draw all pieces except the one being dragged
     pieces.forEach(p => {
       if (p !== draggingPiece) {
         ctx.drawImage(
-          puzzle
           puzzleImage,
           p.correctCol * pieceSize, p.correctRow * pieceSize, pieceSize, pieceSize,
           p.col * pieceSize, p.row * pieceSize, pieceSize, pieceSize
@@ -249,7 +255,7 @@
       }
     });
 
-    // Draw dragged piece following mouse
+    // Draw the dragged piece following the cursor
     ctx.globalAlpha = 0.8;
     ctx.drawImage(
       puzzleImage,
@@ -258,7 +264,6 @@
     );
     ctx.globalAlpha = 1;
   }
-
   function endDrag(e, ctx, gridSize) {
     if (!draggingPiece) return;
 
@@ -266,98 +271,43 @@
     const dropCol = Math.floor(mousePos.x / pieceSize);
     const dropRow = Math.floor(mousePos.y / pieceSize);
 
+    // Find the piece currently in the drop position
     const targetPiece = pieces.find(p => p.col === dropCol && p.row === dropRow);
 
-    if (targetPiece && targetPiece !== draggingPiece && !targetPiece.locked) {
-      animateSwap(ctx, gridSize, draggingPiece, targetPiece);
-    } else {
-      drawPuzzle(ctx, gridSize); // Snap back if invalid
+    if (targetPiece && targetPiece !== draggingPiece) {
+      // Swap positions
+      const tempCol = draggingPiece.col;
+      const tempRow = draggingPiece.row;
+      draggingPiece.col = targetPiece.col;
+      draggingPiece.row = targetPiece.row;
+      targetPiece.col = tempCol;
+      targetPiece.row = tempRow;
     }
+
+    // Lock pieces if they are in the correct spot
+    pieces.forEach(p => {
+      if (p.col === p.correctCol && p.row === p.correctRow) {
+        p.locked = true;
+      }
+    });
 
     draggingPiece = null;
-  }
+    drawPuzzle(ctx, gridSize);
 
-  function animateSwap(ctx, gridSize, pieceA, pieceB) {
-    const startAx = pieceA.col * pieceSize;
-    const startAy = pieceA.row * pieceSize;
-    const startBx = pieceB.col * pieceSize;
-    const startBy = pieceB.row * pieceSize;
-
-    const targetAx = pieceB.col * pieceSize;
-    const targetAy = pieceB.row * pieceSize;
-    const targetBx = pieceA.col * pieceSize;
-    const targetBy = pieceA.row * pieceSize;
-
-    const duration = 200; // ms
-    let startTime = null;
-
-    function animate(time) {
-      if (!startTime) startTime = time;
-      const progress = Math.min((time - startTime) / duration, 1);
-
-      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-      // Draw all pieces except the two moving ones
-      pieces.forEach(p => {
-        if (p !== pieceA && p !== pieceB) {
-          ctx.drawImage(
-            puzzleImage,
-            p.correctCol * pieceSize, p.correctRow * pieceSize, pieceSize, pieceSize,
-            p.col * pieceSize, p.row * pieceSize, pieceSize, pieceSize
-          );
+    // ✅ Check if puzzle is solved
+    if (pieces.every(p => p.locked)) {
+      clearInterval(timer);
+      completionSounds[currentLevel].play(); // Play sound for this level
+      setTimeout(() => {
+        if (currentLevel < levels.length - 1) {
+          currentLevel++;
+          document.getElementById('nextScreen').style.display = 'flex';
+        } else {
+          alert("🎉 Congratulations! You solved all puzzles!");
+          document.getElementById('startScreen').style.display = 'flex';
         }
-      });
-
-      // Draw moving pieces interpolated
-      ctx.drawImage(
-        puzzleImage,
-        pieceA.correctCol * pieceSize, pieceA.correctRow * pieceSize, pieceSize, pieceSize,
-        startAx + (targetAx - startAx) * progress,
-        startAy + (targetAy - startAy) * progress,
-        pieceSize, pieceSize
-      );
-
-      ctx.drawImage(
-        puzzleImage,
-        pieceB.correctCol * pieceSize, pieceB.correctRow * pieceSize, pieceSize, pieceSize,
-        startBx + (targetBx - startBx) * progress,
-        startBy + (targetBy - startBy) * progress,
-        pieceSize, pieceSize
-      );
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        // Swap positions in data
-        [pieceA.col, pieceB.col] = [pieceB.col, pieceA.col];
-        [pieceA.row, pieceB.row] = [pieceB.row, pieceA.row];
-
-        // Lock correct pieces
-        pieces.forEach(p => {
-          if (p.col === p.correctCol && p.row === p.correctRow) {
-            p.locked = true;
-          }
-        });
-
-        drawPuzzle(ctx, gridSize);
-
-        // Check if puzzle is solved
-        if (pieces.every(p => p.locked)) {
-          clearInterval(timer);
-          completionSounds[currentLevel].play(); // Play sound for this level
-          setTimeout(() => {
-            if (currentLevel < levels.length - 1) {
-              currentLevel++;
-              document.getElementById('nextScreen').style.display = 'flex';
-            } else {
-              alert("🎉 Congratulations! You solved all puzzles document.getElementById('startScreen').style.display = 'flex';
-            }
-          }, 500);
-        }
-      }
+      }, 500);
     }
-
-    requestAnimationFrame(animate);
   }
 </script>
 </body>
