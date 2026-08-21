@@ -2,71 +2,55 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tad's Broken Pictures</title>
 <style>
   body {
     font-family: Arial, sans-serif;
-    margin: 0;
-    background: #f0f0f0;
     text-align: center;
+    background: #cceeff;
+    margin: 0;
+    padding: 0;
   }
-  #startScreen {
-    display: flex;
+  #startScreen, #gameScreen {
+    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100vh;
-    background: #dff6ff;
   }
-  #startScreen h1 {
-    font-size: 2.5em;
-    margin-bottom: 20px;
+  #startScreen {
+    display: flex;
   }
-  #startScreen img {
-    max-width: 300px;
-    margin-bottom: 20px;
-  }
-  #startScreen button {
-    padding: 12px 24px;
-    font-size: 18px;
-    cursor: pointer;
-    background: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 6px;
-  }
-  #gameScreen {
-    display: none;
-    padding: 20px;
+  #gameCanvas {
+    border: 4px solid #333;
+    background: #88cc88;
+    touch-action: none;
   }
   #timerDisplay {
     font-size: 20px;
-    margin-bottom: 10px;
+    margin: 10px;
   }
-  canvas {
-    background: white;
-    border: 2px solid #333;
-    touch-action: none; /* Prevent scrolling on touch drag */
+  button {
+    padding: 10px 20px;
+    font-size: 18px;
+    cursor: pointer;
   }
 </style>
 </head>
 <body>
 
-<!-- Start Screen -->
 <div id="startScreen">
   <h1>Tad's Broken Pictures</h1>
-  <img id="startImage" src="frog.png" alt="Frog">
+  <img id="startImage" src="frog.png" alt="Frog" width="200">
   <button onclick="startLevel(0)">Start Game</button>
 </div>
 
-<!-- Game Screen -->
 <div id="gameScreen">
   <div id="timerDisplay">Time: 0</div>
-  <canvas id="gameCanvas" width="500" height="500"></canvas>
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
 </div>
-
 <script>
-// Game levels configuration (now using .png files)
 const levels = [
   { img: 'image1.png', size: 2, time: 10 },
   { img: 'image2.png', size: 3, time: 35 },
@@ -74,137 +58,117 @@ const levels = [
   { img: 'image4.png', size: 5, time: 75 }
 ];
 
-// Game state variables
 let currentLevel = 0;
 let pieces = [];
 let pieceSize;
 let puzzleImage = new Image();
-let draggingPiece = null;
-let offsetX, offsetY;
 let timer;
 let timeLeft;
-let failCount = [0, 0, 0, 0];
 
-// Sounds (optional - ensure these files exist or remove these lines)
-const completionSounds = [
-  new Audio("sound1.mp3"),
-  new Audio("sound2.mp3"),
-  new Audio("sound3.mp3"),
-  new Audio("sound4.mp3")
-];
-const failSound = new Audio("fail.mp3");
+// Optional sounds (won’t break if missing)
+const completionSounds = [null, null, null, null];
+const failSound = null;
 
-// Start a level
 function startLevel(levelIndex) {
   currentLevel = levelIndex;
   document.getElementById('startScreen').style.display = 'none';
-  document.getElementById('gameScreen').style.display = 'block';
+  document.getElementById('gameScreen').style.display = 'flex';
 
-  const { img, size, time } = levels[levelIndex];
+  const { img, size } = levels[levelIndex];
   puzzleImage.src = img;
   puzzleImage.onload = () => {
     createGrid(size);
-    timeLeft = time;
-    startTimer();
   };
 }
 function createGrid(gridSize) {
-  const ctx = document.getElementById('gameCanvas').getContext('2d');
-  const canvas = ctx.canvas;
-
+  const canvas = document.getElementById('gameCanvas');
   pieceSize = canvas.width / gridSize;
-  pieces = [];
 
-  // Create puzzle pieces with random positions
+  // Create ordered grid
+  pieces = [];
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
       pieces.push({
         correctRow: row,
         correctCol: col,
-        x: Math.random() * (canvas.width - pieceSize),
-        y: Math.random() * (canvas.height - pieceSize),
-        locked: false
+        currentRow: row,
+        currentCol: col
       });
     }
   }
 
-  drawPuzzle();
-  enableDragAndDrop(gridSize);
+  // Show full image for 2 seconds before scrambling
+  drawFullImage();
+  setTimeout(() => {
+    shufflePieces();
+    drawPuzzle();
+    enableDragAndDrop(gridSize);
+    startTimer();
+  }, 2000);
+}
+
+function drawFullImage() {
+  const ctx = document.getElementById('gameCanvas').getContext('2d');
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.drawImage(puzzleImage, 0, 0, ctx.canvas.width, ctx.canvas.height);
+}
+
+function shufflePieces() {
+  for (let i = pieces.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieces[i].currentRow, pieces[j].currentRow] = [pieces[j].currentRow, pieces[i].currentRow];
+    [pieces[i].currentCol, pieces[j].currentCol] = [pieces[j].currentCol, pieces[i].currentCol];
+  }
 }
 
 function drawPuzzle() {
   const ctx = document.getElementById('gameCanvas').getContext('2d');
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-  // Draw pond background first
+  // Draw pond background
   const pond = new Image();
   pond.src = 'pond.png';
   ctx.drawImage(pond, 0, 0, ctx.canvas.width, ctx.canvas.height);
 
-  // Draw puzzle pieces
+  // Draw each piece in its current grid position
   pieces.forEach(piece => {
     ctx.drawImage(
       puzzleImage,
       piece.correctCol * pieceSize, piece.correctRow * pieceSize, pieceSize, pieceSize,
-      piece.x, piece.y, pieceSize, pieceSize
+      piece.currentCol * pieceSize, piece.currentRow * pieceSize, pieceSize, pieceSize
     );
-    ctx.strokeRect(piece.x, piece.y, pieceSize, pieceSize);
+    ctx.strokeRect(piece.currentCol * pieceSize, piece.currentRow * pieceSize, pieceSize, pieceSize);
   });
 }
+
 function enableDragAndDrop(gridSize) {
   const canvas = document.getElementById('gameCanvas');
+  let draggedPiece = null;
 
-  // Mouse events
   canvas.onmousedown = (e) => startDrag(e);
-  canvas.onmousemove = (e) => drag(e);
-  canvas.onmouseup = () => endDrag();
+  canvas.onmouseup = (e) => endDrag(e);
 
-  // Touch events
-  canvas.ontouchstart = (e) => {
-    e.preventDefault();
-    startDrag(e.touches[0]);
-  };
-  canvas.ontouchmove = (e) => {
-    e.preventDefault();
-    drag(e.touches[0]);
-  };
-  canvas.ontouchend = (e) => {
-    e.preventDefault();
-    endDrag();
-  };
+  canvas.ontouchstart = (e) => startDrag(e.touches[0]);
+  canvas.ontouchend = (e) => endDrag(e.changedTouches[0]);
 
   function startDrag(e) {
     const pos = getMousePos(canvas, e);
-    draggingPiece = getPieceAt(pos);
-    if (draggingPiece && !draggingPiece.locked) {
-      offsetX = pos.x - draggingPiece.x;
-      offsetY = pos.y - draggingPiece.y;
-    }
+    draggedPiece = getPieceAtGrid(pos, gridSize);
   }
 
-  function drag(e) {
-    if (draggingPiece && !draggingPiece.locked) {
-      const pos = getMousePos(canvas, e);
-      draggingPiece.x = pos.x - offsetX;
-      draggingPiece.y = pos.y - offsetY;
-      drawPuzzle();
-    }
-  }
+  function endDrag(e) {
+    if (!draggedPiece) return;
+    const pos = getMousePos(canvas, e);
+    const targetPiece = getPieceAtGrid(pos, gridSize);
 
-  function endDrag() {
-    if (draggingPiece && !draggingPiece.locked) {
-      const correctX = draggingPiece.correctCol * pieceSize;
-      const correctY = draggingPiece.correctRow * pieceSize;
-      if (Math.abs(draggingPiece.x - correctX) < 10 &&
-          Math.abs(draggingPiece.y - correctY) < 10) {
-        draggingPiece.x = correctX;
-        draggingPiece.y = correctY;
-        draggingPiece.locked = true;
-        checkCompletion(gridSize);
-      }
-      drawPuzzle();
+    if (targetPiece && targetPiece !== draggedPiece) {
+      // Swap positions
+      [draggedPiece.currentRow, targetPiece.currentRow] = [targetPiece.currentRow, draggedPiece.currentRow];
+      [draggedPiece.currentCol, targetPiece.currentCol] = [targetPiece.currentCol, draggedPiece.currentCol];
     }
-    draggingPiece = null;
+    drawPuzzle();
+    checkCompletion();
+    draggedPiece = null;
   }
 }
 
@@ -216,51 +180,43 @@ function getMousePos(canvas, evt) {
   };
 }
 
-function getPieceAt(pos) {
-  for (let i = pieces.length - 1; i >= 0; i--) {
-    const p = pieces[i];
-    if (pos.x > p.x && pos.x < p.x + pieceSize &&
-        pos.y > p.y && pos.y < p.y + pieceSize) {
-      return p;
-    }
-  }
-  return null;
+function getPieceAtGrid(pos, gridSize) {
+  const col = Math.floor(pos.x / pieceSize);
+  const row = Math.floor(pos.y / pieceSize);
+  return pieces.find(p => p.currentRow === row && p.currentCol === col);
 }
 function startTimer() {
-  const timerDisplay = document.getElementById('timerDisplay');
-  timerDisplay.textContent = `Time: ${timeLeft}`;
+  const { time } = levels[currentLevel];
+  timeLeft = time;
+  document.getElementById('timerDisplay').textContent = `Time: ${timeLeft}`;
 
   clearInterval(timer);
   timer = setInterval(() => {
     timeLeft--;
-    timerDisplay.textContent = `Time: ${timeLeft}`;
-
+    document.getElementById('timerDisplay').textContent = `Time: ${timeLeft}`;
     if (timeLeft <= 0) {
       clearInterval(timer);
-      failSound.play();
-      failCount[currentLevel]++;
-
+      if (failSound) failSound.play();
+      alert("⏳ Time's up!");
       if (currentLevel < levels.length - 1) {
-        setTimeout(() => startLevel(currentLevel + 1), 1500);
+        startLevel(currentLevel + 1);
       } else {
-        alert("⏳ Time's up! Game over.");
         resetGame();
       }
     }
   }, 1000);
 }
 
-function checkCompletion(gridSize) {
-  const allLocked = pieces.every(p => p.locked);
-
-  if (allLocked) {
+function checkCompletion() {
+  const allCorrect = pieces.every(p => p.currentRow === p.correctRow && p.currentCol === p.correctCol);
+  if (allCorrect) {
     clearInterval(timer);
-    completionSounds[currentLevel].play();
-
+    if (completionSounds[currentLevel]) completionSounds[currentLevel].play();
+    alert("✅ Puzzle Complete!");
     if (currentLevel < levels.length - 1) {
-      setTimeout(() => startLevel(currentLevel + 1), 1500);
+      startLevel(currentLevel + 1);
     } else {
-      alert("🎉 Congratulations! You completed all puzzles!");
+      alert("🎉 All puzzles complete!");
       resetGame();
     }
   }
@@ -268,10 +224,8 @@ function checkCompletion(gridSize) {
 
 function resetGame() {
   clearInterval(timer);
-  pieces = [];
-  draggingPiece = null;
   currentLevel = 0;
-  failCount = [0, 0, 0, 0];
+  pieces = [];
   document.getElementById('gameScreen').style.display = 'none';
   document.getElementById('startScreen').style.display = 'flex';
 }
