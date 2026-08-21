@@ -68,7 +68,7 @@
 <div id="startScreen">
   <div id="startContent">
     <img src="frog.png" alt="Frog">
-    <button onclick="startLevel(0)">Start Game</button>
+    <button onclick="playStartSoundAndBegin()">Start Game</button>
   </div>
 </div>
 
@@ -100,6 +100,13 @@ let timer, timeLeft;
 let failCounts = [];
 let scrambleTimeout;
 
+// ================== START BUTTON HANDLER ==================
+function playStartSoundAndBegin() {
+  let startSound = new Audio('start.mp3');
+  startSound.play().catch(() => {});
+  startLevel(0);
+}
+
 // ================== DRAWING FUNCTIONS ==================
 function drawFullImage() {
   const canvas = document.getElementById('gameCanvas');
@@ -115,8 +122,7 @@ function drawPuzzle() {
 
   pieces.forEach(piece => {
     const sx = piece.correctCol * pieceSize;
-    const sy = piece
-.correctRow * pieceSize;
+    const sy = piece.correctRow * pieceSize;
     const dx = piece.currentCol * (canvas.width / gridSize);
     const dy = piece.currentRow * (canvas.height / gridSize);
     const size = canvas.width / gridSize;
@@ -133,10 +139,6 @@ function drawPuzzle() {
 
 // ================== GAME SETUP ==================
 function startLevel(levelIndex) {
-  // Play start sound
-  let startSound = new Audio('start.mp3');
-  startSound.play().catch(() => {});
-
   currentLevel = levelIndex;
   document.getElementById('startScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'flex';
@@ -185,7 +187,6 @@ function createGrid(size) {
     }
   }, 2000);
 }
-
 // ================== PUZZLE HELPERS ==================
 function shufflePieces() {
   for (let i = pieces.length - 1; i > 0; i--) {
@@ -227,7 +228,7 @@ function enableDragAndDrop(size) {
       const ctx = canvas.getContext('2d');
       const sx = draggedPiece.correctCol * pieceSize;
       const sy = draggedPiece.correctRow * pieceSize;
-      ctx.drawImage(puzzleImage,    sx, sy, pieceSize, pieceSize, dragX, dragY, canvas.width / size, canvas.height / size);
+      ctx.drawImage(puzzleImage, sx, sy, pieceSize, pieceSize, dragX, dragY, canvas.width / size, canvas.height / size);
     }
   }
 
@@ -275,7 +276,6 @@ function enableDragAndDrop(size) {
     endDrag(touch.clientX - rect.left, touch.clientY - rect.top);
   };
 }
-
 // ================== TIMER & LEVEL PROGRESSION ==================
 function startTimer() {
   timeLeft = levels[currentLevel].time;
