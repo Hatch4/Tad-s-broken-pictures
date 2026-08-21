@@ -10,7 +10,6 @@
       color: white;
       text-align: center;
     }
-    /* Start Screen Styles */
     #startScreen {
       position: fixed;
       top: 0;
@@ -24,6 +23,11 @@
       justify-content: center;
       align-items: center;
       z-index: 9999;
+    }
+    #startScreen img {
+      width: 150px;
+      height: auto;
+      margin-bottom: 20px;
     }
     #startScreen h1 {
       font-size: 3em;
@@ -59,6 +63,7 @@
 <body>
 
 <div id="startScreen">
+  <img src="frog.png" alt="Frog">
   <h1>Tad's Broken Pictures</h1>
   <button id="startButton">Start Game</button>
 </div>
@@ -66,22 +71,24 @@
 <div id="timerDisplay">Time: 0</div>
 <canvas id="gameCanvas" width="600" height="600"></canvas>
 <script>
-  // Start screen sound
+  // Load start sound
   let startSound = new Audio('start.mp3');
 
+  // Try autoplay on page load
   window.addEventListener('load', () => {
     startSound.play().catch(() => {
       console.log("Autoplay blocked, will play on button click.");
     });
   });
 
+  // Start button click
   document.getElementById('startButton').addEventListener('click', () => {
-    startSound.pause();
-    startSound.currentTime = 0;
+    startSound.play();
     document.getElementById('startScreen').style.display = 'none';
     startGame();
   });
 
+  // Level data
   const levels = [
     { src: 'image1.png', grid: 2, time: 10 },
     { src: 'image2.png', grid: 3, time: 35 },
@@ -97,8 +104,6 @@
   let pieceWidth, pieceHeight;
   let draggingPiece = null;
   let offsetX, offsetY;
-  let offsetXCenter = 0;
-  let offsetYCenter = 0;
 
   function startGame() {
     currentLevel = 0;
@@ -111,7 +116,7 @@
     document.getElementById('timerDisplay').textContent = "Time: " + timeLeft;
 
     puzzleImage.onload = function() {
-      scrambleImage(level.grid);
+      createGrid(level.grid);
       startTimer();
     };
     puzzleImage.src = level.src;
@@ -128,26 +133,22 @@
       }
     }, 1000);
   }
-  function scrambleImage(gridSize) {
+  function createGrid(gridSize) {
     const ctx = document.getElementById('gameCanvas').getContext('2d');
     const canvas = ctx.canvas;
 
-    pieceWidth = Math.floor(canvas.width / gridSize);
-    pieceHeight = Math.floor(canvas.height / gridSize);
+    pieceWidth = canvas.width / gridSize;
+    pieceHeight = canvas.height / gridSize;
 
-    // Center offsets
-    offsetXCenter = (canvas.width - (pieceWidth * gridSize)) / 2;
-    offsetYCenter = (canvas.height - (pieceHeight * gridSize)) / 2;
-
-    // Create pieces array
+    // Create pieces with correct positions
     pieces = [];
     for (let row = 0; row < gridSize; row++) {
       for (let col = 0; col < gridSize; col++) {
         pieces.push({
-          correctX: col * pieceWidth,
-          correctY: row * pieceHeight,
-          x: 0,
-          y: 0,
+          correctCol: col,
+          correctRow: row,
+          col: col,
+          row: row,
           locked: false
         });
       }
@@ -158,21 +159,21 @@
 
     // Assign shuffled positions
     pieces.forEach((p, i) => {
-      p.x = (i % gridSize) * pieceWidth;
-      p.y = Math.floor(i / gridSize) * pieceHeight;
+      p.col = i % gridSize;
+      p.row = Math.floor(i / gridSize);
     });
 
-    drawPuzzle(ctx);
+    drawPuzzle(ctx, gridSize);
     setupDragAndDrop(ctx, gridSize);
   }
 
-  function drawPuzzle(ctx) {
+  function drawPuzzle(ctx, gridSize) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     pieces.forEach(p => {
       ctx.drawImage(
         puzzleImage,
-        p.correctX, p.correctY, pieceWidth, pieceHeight,
-        p.x + offsetXCenter, p.y + offsetYCenter, pieceWidth, pieceHeight
+        p.correctCol * pieceWidth, p.correctRow * pieceHeight, pieceWidth, pieceHeight,
+        p.col * pieceWidth, p.row * pieceHeight, pieceWidth, pieceHeight
       );
     });
   }
@@ -180,65 +181,80 @@
   function setupDragAndDrop(ctx, gridSize) {
     const canvas = ctx.canvas;
 
-    canvas.onmousedown = e => startDrag(e, ctx);
-    canvas.onmousemove = e => drag(e, ctx);
+    canvas.onmousedown = e => startDrag(e, ctx, gridSize);
+    canvas.onmousemove = e => drag(e, ctx, gridSize);
     canvas.onmouseup = e => endDrag(e, ctx, gridSize);
 
     // Touch support
-    canvas.ontouchstart = e => startDrag(e.touches[0], ctx);
-    canvas.ontouchmove = e => { e.preventDefault(); drag(e.touches[0], ctx); };
+    canvas.ontouchstart = e => startDrag(e.touches[0], ctx, gridSize);
+    canvas.ontouchmove = e => { e.preventDefault(); drag(e.touches[0], ctx, gridSize); };
     canvas.ontouchend = e => endDrag(e.changedTouches[0], ctx, gridSize);
   }
   function getMousePos(canvas, e) {
     const rect = canvas.getBoundingClientRect();
     return {
-      x: e.clientX - rect.left - offsetXCenter,
-      y: e.clientY - rect.top - offsetYCenter
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
     };
   }
 
-  function startDrag(e, ctx) {
+  function startDrag(e, ctx, gridSize) {
     const mousePos = getMousePos(ctx.canvas, e);
-    draggingPiece = pieces.find(p =>
-      !p.locked &&
-      mousePos.x > p.x && mousePos.x < p.x + pieceWidth &&
-      mousePos.y > p.y && mousePos.y < p.y + pieceHeight
-    );
+    const col = Math.floor(mousePos.x / pieceWidth);
+    const row = Math.floor(mousePos.y / pieceHeight);
+
+    draggingPiece = pieces.find(p => p.col === col && p.row === row && !p.locked);
     if (draggingPiece) {
-      offsetX = mousePos.x - draggingPiece.x;
-      offsetY = mousePos.y - draggingPiece.y;
+      offsetX = mousePos.x - col * pieceWidth;
+      offsetY = mousePos.y - row * pieceHeight;
     }
   }
 
-  function drag(e, ctx) {
+  function drag(e, ctx, gridSize) {
     if (!draggingPiece) return;
     const mousePos = getMousePos(ctx.canvas, e);
-    draggingPiece.x = mousePos.x - offsetX;
-    draggingPiece.y = mousePos.y - offsetY;
-    drawPuzzle(ctx);
+    drawPuzzle(ctx, gridSize);
+
+    // Draw dragged piece following mouse
+    ctx.globalAlpha = 0.8;
+    ctx.drawImage(
+      puzzleImage,
+      draggingPiece.correctCol * pieceWidth, draggingPiece.correctRow * pieceHeight, pieceWidth, pieceHeight,
+      mousePos.x - offsetX, mousePos.y - offsetY, pieceWidth, pieceHeight
+    );
+    ctx.globalAlpha = 1;
   }
 
   function endDrag(e, ctx, gridSize) {
     if (!draggingPiece) return;
 
-    // Snap threshold
-    const snapThreshold = 10;
-    if (Math.abs(draggingPiece.x - draggingPiece.correctX) < snapThreshold &&
-        Math.abs(draggingPiece.y - draggingPiece.correctY) < snapThreshold) {
-      draggingPiece.x = draggingPiece.correctX;
-      draggingPiece.y = draggingPiece.correctY;
-      draggingPiece.locked = true;
+    const mousePos = getMousePos(ctx.canvas, e);
+    const dropCol = Math.floor(mousePos.x / pieceWidth);
+    const dropRow = Math.floor(mousePos.y / pieceHeight);
+
+    // Find piece currently in drop location
+    const targetPiece = pieces.find(p => p.col === dropCol && p.row === dropRow);
+
+    if (targetPiece && targetPiece !== draggingPiece && !targetPiece.locked) {
+      // Swap positions
+      [draggingPiece.col, targetPiece.col] = [targetPiece.col, draggingPiece.col];
+      [draggingPiece.row, targetPiece.row] = [targetPiece.row, draggingPiece.row];
     } else {
-      // Snap to nearest grid slot
-      draggingPiece.x = Math.round(draggingPiece.x / pieceWidth) * pieceWidth;
-      draggingPiece.y = Math.round(draggingPiece.y / pieceHeight) * pieceHeight;
+      // Snap back to original position
     }
 
-    drawPuzzle(ctx);
+    // Lock if correct
+    pieces.forEach(p => {
+      if (p.col === p.correctCol && p.row === p.correctRow) {
+        p.locked = true;
+      }
+    });
+
+    drawPuzzle(ctx, gridSize);
     draggingPiece = null;
 
     // Check if puzzle is solved
-    if (pieces.every(p => p.x === p.correctX && p.y === p.correctY)) {
+    if (pieces.every(p => p.locked)) {
       clearInterval(timer);
       setTimeout(() => {
         currentLevel++;
