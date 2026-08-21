@@ -2,10 +2,62 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Broken Pictures Puzzle</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tad's Broken Pictures</title>
 <style>
-  body { font-family: sans-serif; text-align: center; background: #f0f0f0; margin: 0; }
-  #gameScreen { display: none; flex-direction: column; align-items: center; }
+  body { 
+    font-family: sans-serif; 
+    text-align: center; 
+    background: #f0f0f0; 
+    margin: 0; 
+  }
+
+  /* Start screen styling */
+  #startScreen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: url('pond.png') no-repeat center center;
+    background-size: cover;
+  }
+
+  #startContent {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 20px;
+    border-radius: 10px;
+  }
+
+  #startContent img {
+    max-width: 100px;
+    height: auto;
+  }
+
+  #startContent button {
+    padding: 10px 20px;
+    font-size: 18px;
+    cursor: pointer;
+    border: none;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+  }
+
+  #startContent button:hover {
+    background-color: #45a049;
+  }
+
+  #gameScreen { 
+    display: none; 
+    flex-direction: column; 
+    align-items: center; 
+  }
+
   #puzzleArea { margin-top: 10px; }
   canvas { background: #ddd; touch-action: none; max-width: 95vw; height: auto; }
   #nextButton { margin-top: 10px; padding: 8px 16px; font-size: 16px; }
@@ -14,8 +66,10 @@
 <body>
 
 <div id="startScreen">
-  <h1>Broken Pictures Puzzle</h1>
-  <button onclick="startLevel(0)">Start Game</button>
+  <div id="startContent">
+    <img src="frog.png" alt="Frog">
+    <button onclick="startLevel(0)">Start Game</button>
+  </div>
 </div>
 
 <div id="gameScreen">
@@ -23,24 +77,29 @@
   <div id="puzzleArea">
     <canvas id="gameCanvas" width="500" height="500"></canvas>
   </div>
-  <button id="nextButton" style="display:none;" onclick="goToNextLevel()">Next Puzzle</button>
+  <button id="nextButton" onclick="goToNextLevel()">Next Puzzle</button>
 </div>
 
 <script>
-// ================== GAME VARIABLES ==================
+// ================== VARIABLES ==================
 let levels = [
   { img: 'image1.png', size: 2, time: 10 },
   { img: 'image2.png', size: 3, time: 35 },
   { img: 'image3.png', size: 4, time: 50 },
   { img: 'image4.png', size: 5, time: 75 }
 ];
+
 let currentLevel = 0;
 let puzzleImage = new Image();
-let gridSize, pieceSize, pieces = [];
-let draggedPiece = null, dragOffsetX = 0, dragOffsetY = 0, dragX = 0, dragY = 0;
+let gridSize, pieceSize;
+let pieces = [];
+let draggedPiece = null;
+let dragOffsetX = 0, dragOffsetY = 0;
+let dragX = 0, dragY = 0;
 let timer, timeLeft;
 let failCounts = [];
 let scrambleTimeout;
+
 // ================== DRAWING FUNCTIONS ==================
 function drawFullImage() {
   const canvas = document.getElementById('gameCanvas');
@@ -56,7 +115,8 @@ function drawPuzzle() {
 
   pieces.forEach(piece => {
     const sx = piece.correctCol * pieceSize;
-    const sy = piece.correctRow * pieceSize;
+    const sy = piece
+.correctRow * pieceSize;
     const dx = piece.currentCol * (canvas.width / gridSize);
     const dy = piece.currentRow * (canvas.height / gridSize);
     const size = canvas.width / gridSize;
@@ -73,6 +133,10 @@ function drawPuzzle() {
 
 // ================== GAME SETUP ==================
 function startLevel(levelIndex) {
+  // Play start sound
+  let startSound = new Audio('start.mp3');
+  startSound.play().catch(() => {});
+
   currentLevel = levelIndex;
   document.getElementById('startScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'flex';
@@ -121,6 +185,7 @@ function createGrid(size) {
     }
   }, 2000);
 }
+
 // ================== PUZZLE HELPERS ==================
 function shufflePieces() {
   for (let i = pieces.length - 1; i > 0; i--) {
@@ -162,17 +227,25 @@ function enableDragAndDrop(size) {
       const ctx = canvas.getContext('2d');
       const sx = draggedPiece.correctCol * pieceSize;
       const sy = draggedPiece.correctRow * pieceSize;
-      ctx.drawImage(puzzleImage, sx, sy, pieceSize, pieceSize, dragX, dragY, canvas.width / size, canvas.height / size);
+      ctx.drawImage(puzzleImage,    sx, sy, pieceSize, pieceSize, dragX, dragY, canvas.width / size, canvas.height / size);
     }
   }
 
   function endDrag(x, y) {
     if (draggedPiece) {
+      const col = Math.floor(x / (canvas.width / size));
+      const row = Math.floor(y / (canvas.height / size));
+
+      // Swap positions
       const targetPiece = getPieceAt(x, y);
-      if (targetPiece && targetPiece !== draggedPiece) {
+      if (targetPiece && !targetPiece.locked) {
         [draggedPiece.currentRow, targetPiece.currentRow] = [targetPiece.currentRow, draggedPiece.currentRow];
         [draggedPiece.currentCol, targetPiece.currentCol] = [targetPiece.currentCol, draggedPiece.currentCol];
+      } else {
+        draggedPiece.currentRow = row;
+        draggedPiece.currentCol = col;
       }
+
       lockCorrectPieces();
       drawPuzzle();
       checkCompletion();
@@ -181,39 +254,28 @@ function enableDragAndDrop(size) {
   }
 
   // Mouse events
-  canvas.onmousedown = e => {
-    const rect = canvas.getBoundingClientRect();
-    startDrag(e.clientX - rect.left, e.clientY - rect.top);
-  };
-  canvas.onmousemove = e => {
-    const rect = canvas.getBoundingClientRect();
-    moveDrag(e.clientX - rect.left, e.clientY - rect.top);
-  };
-  canvas.onmouseup = e => {
-    const rect = canvas.getBoundingClientRect();
-    endDrag(e.clientX - rect.left, e.clientY - rect.top);
-  };
+  canvas.onmousedown = e => startDrag(e.offsetX, e.offsetY);
+  canvas.onmousemove = e => moveDrag(e.offsetX, e.offsetY);
+  canvas.onmouseup = e => endDrag(e.offsetX, e.offsetY);
 
   // Touch events
   canvas.ontouchstart = e => {
     const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
     startDrag(touch.clientX - rect.left, touch.clientY - rect.top);
-    e.preventDefault();
   };
   canvas.ontouchmove = e => {
     const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
     moveDrag(touch.clientX - rect.left, touch.clientY - rect.top);
-    e.preventDefault();
   };
   canvas.ontouchend = e => {
     const rect = canvas.getBoundingClientRect();
     const touch = e.changedTouches[0];
     endDrag(touch.clientX - rect.left, touch.clientY - rect.top);
-    e.preventDefault();
   };
 }
+
 // ================== TIMER & LEVEL PROGRESSION ==================
 function startTimer() {
   timeLeft = levels[currentLevel].time;
@@ -232,6 +294,11 @@ function startTimer() {
 function handleLevelFail() {
   if (!failCounts[currentLevel]) failCounts[currentLevel] = 0;
   failCounts[currentLevel]++;
+
+  // Play fail sound
+  let failSound = new Audio('fail.mp3');
+  failSound.play().catch(() => {});
+
   alert("⏳ Time's up! Try again.");
   startLevel(currentLevel);
 }
@@ -240,6 +307,11 @@ function checkCompletion() {
   const allCorrect = pieces.every(p => p.locked);
   if (allCorrect) {
     clearInterval(timer);
+
+    // Play the sound for the current level
+    let levelSound = new Audio(`sound${currentLevel + 1}.mp3`);
+    levelSound.play().catch(() => {});
+
     document.getElementById('nextButton').style.display = 'inline-block';
   }
 }
@@ -255,6 +327,5 @@ function goToNextLevel() {
   }
 }
 </script>
-
 </body>
 </html>
