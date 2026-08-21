@@ -25,7 +25,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
     overflow: hidden;
   }
 
@@ -92,11 +94,22 @@
     display: none; 
     flex-direction: column; 
     align-items: center; 
+    position: relative;
+    padding-top: 20px;
   }
 
   #puzzleArea { margin-top: 10px; }
-  canvas { background: #ddd; touch-action: none; max-width: 95vw; height: auto; }
+  #gameCanvas { background: #ddd; touch-action: none; max-width: 95vw; height: auto; }
   #nextButton { margin-top: 10px; padding: 8px 16px; font-size: 16px; }
+
+  #fireworksCanvas {
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    z-index:1;
+  }
 </style>
 </head>
 <body>
@@ -130,8 +143,7 @@
 
 <!-- WIN SCREEN -->
 <div id="winScreen">
-  <canvas id="fireworksCanvas"
-          style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+  <canvas id="fireworksCanvas"></canvas>
 
   <img src="frog.png" alt="Frog">
 
@@ -142,32 +154,50 @@
 </div>
 
 <script>
-// ================== iOS AUDIO UNLOCK ==================
+// ================== WEB AUDIO SETUP ==================
+let audioCtx = null;
 let audioUnlocked = false;
-let audioCtx;
+const soundBuffers = {};
 
 function unlockAudio() {
     if (!audioUnlocked) {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AudioContext();
-
-        const buffer = audioCtx.createBuffer(1, 1, 22050);
-        const source = audioCtx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioCtx.destination);
-        source.start(0);
-
         audioUnlocked = true;
     }
 }
 
-function playSound(file) {
-    if (!audioUnlocked) unlockAudio();
-    if (audioCtx && audioCtx.state === "suspended") {
-        audioCtx.resume().catch(() => {});
+async function loadSound(file) {
+    if (!audioCtx) return;
+    if (soundBuffers[file]) return soundBuffers[file];
+
+    try {
+        const response = await fetch(file);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = await audioCtx.decodeAudioData(arrayBuffer);
+        soundBuffers[file] = buffer;
+        return buffer;
+    } catch (e) {
+        console.log("Error loading sound:", file, e);
+        return null;
     }
-    const audio = new Audio(file);
-    audio.play().catch(e => console.log("iOS blocked:", e));
+}
+
+async function playSound(file) {
+    if (!audioUnlocked) unlockAudio();
+    if (!audioCtx) return;
+
+    if (audioCtx.state === "suspended") {
+        try { await audioCtx.resume(); } catch (e) {}
+    }
+
+    const buffer = await loadSound(file);
+    if (!buffer) return;
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
 }
 
 // ================== VARIABLES ==================
@@ -254,7 +284,7 @@ function startLevel(levelIndex) {
 
 function createGrid(size) {
   const canvas = document.getElementById('gameCanvas');
-  pieceSize = canvas.width / size; // use canvas size, not image size
+  pieceSize = canvas.width / size;
 
   pieces = [];
   for (let row = 0; row < size; row++) {
@@ -302,8 +332,9 @@ function lockCorrectPieces() {
 }
 
 function getPieceAt(x, y) {
-  const col = Math.floor(x / (500 / gridSize));
-  const row = Math.floor(y / (500 / gridSize));
+  const canvas = document.getElementById('gameCanvas');
+  const col = Math.floor(x / (canvas.width / gridSize));
+  const row = Math.floor(y / (canvas.height / gridSize));
   return pieces.find(p => p.currentRow === row && p.currentCol === col);
 }
 
@@ -460,6 +491,10 @@ function checkCompletion() {
 function startFireworks() {
     const canvas = document.getElementById('fireworksCanvas');
     const ctx = canvas.getContext('2d');
+
+    // Match canvas size to viewport
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
     let particles = [];
 
