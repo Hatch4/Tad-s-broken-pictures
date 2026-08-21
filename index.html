@@ -18,6 +18,7 @@
   #instructionScreen,
   #winScreen {
     display: none;
+    width: 100vw;
     height: 100vh;
     background: url('pond.png') no-repeat center center;
     background-size: cover;
@@ -162,6 +163,9 @@ function unlockAudio() {
 
 function playSound(file) {
     if (!audioUnlocked) unlockAudio();
+    if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+    }
     const audio = new Audio(file);
     audio.play().catch(e => console.log("iOS blocked:", e));
 }
@@ -250,7 +254,7 @@ function startLevel(levelIndex) {
 
 function createGrid(size) {
   const canvas = document.getElementById('gameCanvas');
-  pieceSize = puzzleImage.width / size;
+  pieceSize = canvas.width / size; // use canvas size, not image size
 
   pieces = [];
   for (let row = 0; row < size; row++) {
