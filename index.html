@@ -179,6 +179,31 @@ function enableDragAndDrop(gridSize) {
     }
     draggingPiece = null;
   };
+
+  canvas.onmousemove = (e) => {
+    if (draggingPiece && !draggingPiece.locked) {
+      const pos = getMousePos(canvas, e);
+      draggingPiece.x = pos.x - offsetX;
+      draggingPiece.y = pos.y - offsetY;
+      drawPuzzle();
+    }
+  };
+
+  canvas.onmouseup = () => {
+    if (draggingPiece && !draggingPiece.locked) {
+      const correctX = draggingPiece.correctCol * pieceSize;
+      const correctY = draggingPiece.correctRow * pieceSize;
+      if (Math.abs(draggingPiece.x - correctX) < 10 &&
+          Math.abs(draggingPiece.y - correctY) < 10) {
+        draggingPiece.x = correctX;
+        draggingPiece.y = correctY;
+        draggingPiece.locked = true;
+        checkCompletion(gridSize);
+      }
+      drawPuzzle();
+    }
+    draggingPiece = null;
+  };
 }
 
 function getMousePos(canvas, evt) {
