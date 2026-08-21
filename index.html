@@ -12,7 +12,6 @@
     margin: 0; 
   }
 
-  /* Start screen styling */
   #startScreen {
     display: flex;
     flex-direction: column;
@@ -81,6 +80,31 @@
 </div>
 
 <script>
+// ================== iOS AUDIO UNLOCK ==================
+let audioUnlocked = false;
+let audioCtx;
+
+function unlockAudio() {
+    if (!audioUnlocked) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+
+        const buffer = audioCtx.createBuffer(1, 1, 22050);
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+        source.start(0);
+
+        audioUnlocked = true;
+    }
+}
+
+function playSound(file) {
+    if (!audioUnlocked) unlockAudio();
+    const audio = new Audio(file);
+    audio.play().catch(e => console.log("iOS blocked:", e));
+}
+
 // ================== VARIABLES ==================
 let levels = [
   { img: 'image1.png', size: 2, time: 10 },
@@ -102,8 +126,8 @@ let scrambleTimeout;
 
 // ================== START BUTTON HANDLER ==================
 function playStartSoundAndBegin() {
-  let startSound = new Audio('start.mp3');
-  startSound.play().catch(() => {});
+  unlockAudio();
+  playSound('start.mp3');
   startLevel(0);
 }
 
@@ -169,7 +193,6 @@ function createGrid(size) {
     }
   }
 
-  // Show the full image for 2 seconds before scrambling
   drawFullImage();
 
   clearTimeout(scrambleTimeout);
@@ -179,7 +202,6 @@ function createGrid(size) {
     drawPuzzle();
     enableDragAndDrop(size);
 
-    // Start timer unless player is in relax mode
     if (!failCounts[currentLevel] || failCounts[currentLevel] < 2) {
       startTimer();
     } else {
@@ -187,6 +209,7 @@ function createGrid(size) {
     }
   }, 2000);
 }
+
 // ================== PUZZLE HELPERS ==================
 function shufflePieces() {
   for (let i = pieces.length - 1; i > 0; i--) {
@@ -208,11 +231,10 @@ function getPieceAt(x, y) {
   return pieces.find(p => p.currentRow === row && p.currentCol === col);
 }
 
-// ================== DRAG & DROP (Mouse + Touch) ==================
+// ================== DRAG & DROP ==================
 function enableDragAndDrop(size) {
   const canvas = document.getElementById('gameCanvas');
 
-  // Unified coordinate function for both mouse & touch
   function getCanvasCoords(evt) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -239,7 +261,7 @@ function enableDragAndDrop(size) {
   function startDrag(x, y) {
     draggedPiece = getPieceAt(x, y);
     if (!draggedPiece || draggedPiece.locked) {
-      draggedPiece = null; // Prevent dragging locked pieces
+      draggedPiece = null;
       return;
     }
     dragOffsetX = x - draggedPiece.currentCol * (canvas.width / size);
@@ -266,15 +288,11 @@ function enableDragAndDrop(size) {
       const targetPiece = getPieceAt(x, y);
 
       if (targetPiece && !targetPiece.locked) {
-        // Swap positions
         [draggedPiece.currentRow, targetPiece.currentRow] = [targetPiece.currentRow, draggedPiece.currentRow];
         [draggedPiece.currentCol, targetPiece.currentCol] = [targetPiece.currentCol, draggedPiece.currentCol];
       } else if (!targetPiece) {
-        // Move into empty space (if allowed)
         draggedPiece.currentRow = row;
         draggedPiece.currentCol = col;
-      } else {
-        // Target is locked — snap back to original position
       }
 
       lockCorrectPieces();
@@ -284,33 +302,13 @@ function enableDragAndDrop(size) {
     }
   }
 
-  // Mouse events
-  canvas.onmousedown = e => {
-    const pos = getCanvasCoords(e);
-    startDrag(pos.x, pos.y);
-  };
-  canvas.onmousemove = e => {
-    const pos = getCanvasCoords(e);
-    moveDrag(pos.x, pos.y);
-  };
-  canvas.onmouseup = e => {
-    const pos = getCanvasCoords(e);
-    endDrag(pos.x, pos.y);
-  };
+  canvas.onmousedown = e => startDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
+  canvas.onmousemove = e => moveDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
+  canvas.onmouseup = e => endDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
 
-  // Touch events
-  canvas.ontouchstart = e => {
-    const pos = getCanvasCoords(e);
-    startDrag(pos.x, pos.y);
-  };
-  canvas.ontouchmove = e => {
-    const pos = getCanvasCoords(e);
-    moveDrag(pos.x, pos.y);
-  };
-  canvas.ontouchend = e => {
-    const pos = getCanvasCoords(e);
-    endDrag(pos.x, pos.y);
-  };
+  canvas.ontouchstart = e => startDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
+  canvas.ontouchmove = e => moveDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
+  canvas.ontouchend = e => endDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
 }
 
 // ================== TIMER & LEVEL PROGRESSION ==================
@@ -332,9 +330,7 @@ function handleLevelFail() {
   if (!failCounts[currentLevel]) failCounts[currentLevel] = 0;
   failCounts[currentLevel]++;
 
-  // Play fail sound
-  let failSound = new Audio('fail.mp3');
-  failSound.play().catch(() => {});
+  playSound('fail.mp3');
 
   alert("⏳ Time's up! Try again.");
   startLevel(currentLevel);
@@ -345,9 +341,7 @@ function checkCompletion() {
   if (allCorrect) {
     clearInterval(timer);
 
-    // Play the sound for the current level
-    let levelSound = new Audio(`sound${currentLevel + 1}.mp3`);
-    levelSound.play().catch(() => {});
+    playSound(`sound${currentLevel + 1}.mp3`);
 
     document.getElementById('nextButton').style.display = 'inline-block';
   }
