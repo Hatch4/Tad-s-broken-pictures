@@ -65,13 +65,12 @@
 </div>
 
 <script>
-
 // Game levels configuration (all files in same folder as HTML)
 const levels = [
-  { img: 'image1.png', size: 2, time: 10 },
-  { img: 'image2.png', size: 3, time: 35 },
-  { img: 'image3.png', size: 4, time: 50 },
-  { img: 'image4.png', size: 5, time: 75 }
+  { img: 'image1.jpg', size: 2, time: 10 },
+  { img: 'image2.jpg', size: 3, time: 35 },
+  { img: 'image3.jpg', size: 4, time: 50 },
+  { img: 'image4.jpg', size: 5, time: 75 }
 ];
 
 // Game state variables
@@ -90,7 +89,7 @@ const completionSounds = [
   new Audio("sound1.mp3"),
   new Audio("sound2.mp3"),
   new Audio("sound3.mp3"),
-  new Audio("sound4.mp3")
+  new Audio("Sound4.mp3")
 ];
 const failSound = new Audio("fail.mp3");
 
@@ -129,8 +128,24 @@ function createGrid(gridSize) {
   }
 
   drawPuzzle();
+}
 
-  // Mouse events
+function drawPuzzle() {
+  const ctx = document.getElementById('gameCanvas').getContext('2d');
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+  pieces.forEach(piece => {
+    ctx.drawImage(
+      puzzleImage,
+      piece.correctCol * pieceSize, piece.correctRow * pieceSize, pieceSize, pieceSize,
+      piece.x, piece.y, pieceSize, pieceSize
+    );
+    ctx.strokeRect(piece.x, piece.y, pieceSize, pieceSize);
+  });
+}
+function enableDragAndDrop(gridSize) {
+  const canvas = document.getElementById('gameCanvas');
+
   canvas.onmousedown = (e) => {
     const pos = getMousePos(canvas, e);
     draggingPiece = getPieceAt(pos);
@@ -151,7 +166,6 @@ function createGrid(gridSize) {
 
   canvas.onmouseup = () => {
     if (draggingPiece && !draggingPiece.locked) {
-      // Snap to correct position if close enough
       const correctX = draggingPiece.correctCol * pieceSize;
       const correctY = draggingPiece.correctRow * pieceSize;
       if (Math.abs(draggingPiece.x - correctX) < 10 &&
@@ -165,20 +179,6 @@ function createGrid(gridSize) {
     }
     draggingPiece = null;
   };
-}
-
-function drawPuzzle() {
-  const ctx = document.getElementById('gameCanvas').getContext('2d');
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-  pieces.forEach(piece => {
-    ctx.drawImage(
-      puzzleImage,
-      piece.correctCol * pieceSize, piece.correctRow * pieceSize, pieceSize, pieceSize,
-      piece.x, piece.y, pieceSize, pieceSize
-    );
-    ctx.strokeRect(piece.x, piece.y, pieceSize, pieceSize);
-  });
 }
 
 function getMousePos(canvas, evt) {
@@ -255,6 +255,30 @@ document.addEventListener('keydown', e => {
     resetGame();
   }
 });
+
+// Enable drag-and-drop after grid creation
+function createGrid(gridSize) {
+  const ctx = document.getElementById('gameCanvas').getContext('2d');
+  const canvas = ctx.canvas;
+
+  pieceSize = canvas.width / gridSize;
+  pieces = [];
+
+  for (let row = 0; row < gridSize; row++) {
+    for (let col = 0; col < gridSize; col++) {
+      pieces.push({
+        correctRow: row,
+        correctCol: col,
+        x: Math.random() * (canvas.width - pieceSize),
+        y: Math.random() * (canvas.height - pieceSize),
+        locked: false
+      });
+    }
+  }
+
+  drawPuzzle();
+  enableDragAndDrop(gridSize);
+}
 </script>
 </body>
 </html>
