@@ -2,45 +2,71 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Broken Pictures Puzzle Game</title>
+<title>Tad's Broken Pictures</title>
 <style>
   body {
     font-family: Arial, sans-serif;
-    text-align: center;
+    margin: 0;
     background: #f0f0f0;
+    text-align: center;
   }
-  #startScreen, #gameScreen {
+  #startScreen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: #dff6ff;
+  }
+  #startScreen h1 {
+    font-size: 2.5em;
+    margin-bottom: 20px;
+  }
+  #startScreen img {
+    max-width: 300px;
+    margin-bottom: 20px;
+  }
+  #startScreen button {
+    padding: 12px 24px;
+    font-size: 18px;
+    cursor: pointer;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+  }
+  #gameScreen {
     display: none;
-  }
-  canvas {
-    background: #fff;
-    border: 2px solid #333;
-    cursor: grab;
+    padding: 20px;
   }
   #timerDisplay {
     font-size: 20px;
-    margin: 10px;
+    margin-bottom: 10px;
+  }
+  canvas {
+    background: white;
+    border: 2px solid #333;
   }
 </style>
 </head>
 <body>
 
+<!-- Start Screen -->
 <div id="startScreen">
-  <h1>Broken Pictures</h1>
-  <img id="startImage" src="pond.png" alt="Pond" style="max-width:300px;">
-  
-
-
+  <h1>Tad's Broken Pictures</h1>
+  <img id="startImage" src="frog.png" alt="Frog">
   <button onclick="startLevel(0)">Start Game</button>
 </div>
 
+<!-- Game Screen -->
 <div id="gameScreen">
-  <div id="timerDisplay"></div>
-  <canvas id="gameCanvas" width="600" height="600"></canvas>
+  <div id="timerDisplay">Time: 0</div>
+  <canvas id="gameCanvas" width="500" height="500"></canvas>
 </div>
 
 <script>
-// Game levels configuration
+
+// Game levels configuration (all files in same folder as HTML)
 const levels = [
   { img: 'image1.jpg', size: 2, time: 10 },
   { img: 'image2.jpg', size: 3, time: 35 },
@@ -59,7 +85,7 @@ let timer;
 let timeLeft;
 let failCount = [0, 0, 0, 0];
 
-// Sounds (Level 4 uses capital S to match your file)
+// Sounds
 const completionSounds = [
   new Audio("sound1.mp3"),
   new Audio("sound2.mp3"),
@@ -67,11 +93,6 @@ const completionSounds = [
   new Audio("Sound4.mp3")
 ];
 const failSound = new Audio("fail.mp3");
-
-// Show start screen on load
-window.onload = () => {
-  document.getElementById('startScreen').style.display = 'block';
-};
 
 // Start a level
 function startLevel(levelIndex) {
@@ -94,91 +115,72 @@ function createGrid(gridSize) {
   pieceSize = canvas.width / gridSize;
   pieces = [];
 
-  // Create pieces with correct positions
+  // Create puzzle pieces with correct positions
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
       pieces.push({
-        correctCol: col,
         correctRow: row,
-        col: col,
-        row: row,
+        correctCol: col,
+        x: Math.random() * (canvas.width - pieceSize),
+        y: Math.random() * (canvas.height - pieceSize),
         locked: false
       });
     }
   }
 
-  // Shuffle pieces
-  pieces.sort(() => Math.random() - 0.5);
-  pieces.forEach((p, i) => {
-    p.col = i % gridSize;
-    p.row = Math.floor(i / gridSize);
-  });
+  drawPuzzle();
 
-  drawPuzzle(ctx, gridSize);
-  setupDragAndDrop(ctx, gridSize);
+  // Mouse events
+  canvas.onmousedown = (e) => {
+    const pos = getMousePos(canvas, e);
+    draggingPiece = getPieceAt(pos);
+    if (draggingPiece && !draggingPiece.locked) {
+      offsetX = pos.x - draggingPiece.x;
+      offsetY = pos.y - draggingPiece.y;
+    }
+  };
+
+  canvas.onmousemove = (e) => {
+    if (draggingPiece && !draggingPiece.locked) {
+      const pos = getMousePos(canvas, e);
+      draggingPiece.x = pos.x - offsetX;
+      draggingPiece.y = pos.y - offsetY;
+      drawPuzzle();
+    }
+  };
+
+  canvas.onmouseup = () => {
+    if (draggingPiece && !draggingPiece.locked) {
+      // Snap to correct position if close enough
+      const correctX = draggingPiece.correctCol * pieceSize;
+      const correctY = draggingPiece.correctRow * pieceSize;
+      if (Math.abs(draggingPiece.x - correctX) < 10 &&
+          Math.abs(draggingPiece.y - correctY) < 10) {
+        draggingPiece.x = correctX;
+        draggingPiece.y = correctY;
+        draggingPiece.locked = true;
+        checkCompletion(gridSize);
+      }
+      drawPuzzle();
+    }
+    draggingPiece = null;
+  };
 }
 
-function drawPuzzle(ctx, gridSize) {
+function drawPuzzle() {
+  const ctx = document.getElementById('gameCanvas').getContext('2d');
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-  // ✅ Cut from the image's natural size to avoid slivers
-  const imgPieceWidth = puzzleImage.width / gridSize;
-  const imgPieceHeight = puzzleImage.height / gridSize;
-
-  pieces.forEach(p => {
+  pieces.forEach(piece => {
     ctx.drawImage(
       puzzleImage,
-      p.correctCol * imgPieceWidth, p.correctRow * imgPieceHeight, imgPieceWidth, imgPieceHeight,
-      p.col * pieceSize, p.row * pieceSize, pieceSize, pieceSize
+      piece.correctCol * pieceSize, piece.correctRow * pieceSize, pieceSize, pieceSize,
+      piece.x, piece.y, pieceSize, pieceSize
     );
+    ctx.strokeRect(piece.x, piece.y, pieceSize, pieceSize);
   });
 }
-function setupDragAndDrop(ctx, gridSize) {
-  const canvas = ctx.canvas;
 
-  // Mouse Down — pick up a piece
-  canvas.onmousedown = e => {
-    const mousePos = getMousePos(canvas, e);
-    const clickedPiece = getPieceAt(mousePos, gridSize);
-
-    if (clickedPiece && !clickedPiece.locked) {
-      draggingPiece = clickedPiece;
-      offsetX = mousePos.x - draggingPiece.col * pieceSize;
-      offsetY = mousePos.y - draggingPiece.row * pieceSize;
-    }
-  };
-
-  // Mouse Move — drag the piece
-  canvas.onmousemove = e => {
-    if (draggingPiece) {
-      const mousePos = getMousePos(canvas, e);
-      draggingPiece.col = (mousePos.x - offsetX) / pieceSize;
-      draggingPiece.row = (mousePos.y - offsetY) / pieceSize;
-      drawPuzzle(ctx, gridSize);
-    }
-  };
-
-  // Mouse Up — drop the piece
-  canvas.onmouseup = e => {
-    if (draggingPiece) {
-      const dropCol = Math.round(draggingPiece.col);
-      const dropRow = Math.round(draggingPiece.row);
-
-      // Snap to grid
-      draggingPiece.col = dropCol;
-      draggingPiece.row = dropRow;
-
-      // Lock if correct
-      if (dropCol === draggingPiece.correctCol && dropRow === draggingPiece.correctRow) {
-        draggingPiece.locked = true;
-      }
-
-      draggingPiece = null;
-      drawPuzzle(ctx, gridSize);
-      checkCompletion(gridSize);
-    }
-  };
-}
 function getMousePos(canvas, evt) {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -187,27 +189,15 @@ function getMousePos(canvas, evt) {
   };
 }
 
-function getPieceAt(pos, gridSize) {
-  const col = Math.floor(pos.x / pieceSize);
-  const row = Math.floor(pos.y / pieceSize);
-  return pieces.find(p => p.col === col && p.row === row);
-}
-function checkCompletion(gridSize) {
-  const allLocked = pieces.every(p => p.locked);
-
-  if (allLocked) {
-    clearInterval(timer);
-    completionSounds[currentLevel].play();
-
-    // Move to next level or end game
-    if (currentLevel < levels.length - 1) {
-      setTimeout(() => startLevel(currentLevel + 1), 1500);
-    } else {
-      alert("🎉 Congratulations! You completed all puzzles!");
-      document.getElementById('gameScreen').style.display = 'none';
-      document.getElementById('startScreen').style.display = 'block';
+function getPieceAt(pos) {
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    const p = pieces[i];
+    if (pos.x > p.x && pos.x < p.x + pieceSize &&
+        pos.y > p.y && pos.y < p.y + pieceSize) {
+      return p;
     }
   }
+  return null;
 }
 function startTimer() {
   const timerDisplay = document.getElementById('timerDisplay');
@@ -227,12 +217,28 @@ function startTimer() {
         setTimeout(() => startLevel(currentLevel + 1), 1500);
       } else {
         alert("⏳ Time's up! Game over.");
-        document.getElementById('gameScreen').style.display = 'none';
-        document.getElementById('startScreen').style.display = 'block';
+        resetGame();
       }
     }
   }, 1000);
 }
+
+function checkCompletion(gridSize) {
+  const allLocked = pieces.every(p => p.locked);
+
+  if (allLocked) {
+    clearInterval(timer);
+    completionSounds[currentLevel].play();
+
+    if (currentLevel < levels.length - 1) {
+      setTimeout(() => startLevel(currentLevel + 1), 1500);
+    } else {
+      alert("🎉 Congratulations! You completed all puzzles!");
+      resetGame();
+    }
+  }
+}
+
 function resetGame() {
   clearInterval(timer);
   pieces = [];
@@ -240,7 +246,7 @@ function resetGame() {
   currentLevel = 0;
   failCount = [0, 0, 0, 0];
   document.getElementById('gameScreen').style.display = 'none';
-  document.getElementById('startScreen').style.display = 'block';
+  document.getElementById('startScreen').style.display = 'flex';
 }
 
 // Allow pressing Escape to reset
