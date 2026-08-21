@@ -40,6 +40,7 @@
 </div>
 
 <script>
+// Game levels configuration
 const levels = [
   { img: 'image1.jpg', size: 2, time: 10 },
   { img: 'image2.jpg', size: 3, time: 35 },
@@ -47,6 +48,7 @@ const levels = [
   { img: 'image4.jpg', size: 5, time: 75 }
 ];
 
+// Game state variables
 let currentLevel = 0;
 let pieces = [];
 let pieceSize;
@@ -57,18 +59,21 @@ let timer;
 let timeLeft;
 let failCount = [0, 0, 0, 0];
 
+// Sounds (Level 4 uses capital S to match your file)
 const completionSounds = [
   new Audio("sound1.mp3"),
   new Audio("sound2.mp3"),
   new Audio("sound3.mp3"),
-  new Audio("Sound4.mp3") // ✅ matches your actual file name
+  new Audio("Sound4.mp3")
 ];
 const failSound = new Audio("fail.mp3");
 
+// Show start screen on load
 window.onload = () => {
   document.getElementById('startScreen').style.display = 'block';
 };
 
+// Start a level
 function startLevel(levelIndex) {
   currentLevel = levelIndex;
   document.getElementById('startScreen').style.display = 'none';
@@ -82,7 +87,6 @@ function startLevel(levelIndex) {
     startTimer();
   };
 }
-
 function createGrid(gridSize) {
   const ctx = document.getElementById('gameCanvas').getContext('2d');
   const canvas = ctx.canvas;
@@ -90,6 +94,7 @@ function createGrid(gridSize) {
   pieceSize = canvas.width / gridSize;
   pieces = [];
 
+  // Create pieces with correct positions
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
       pieces.push({
@@ -102,7 +107,7 @@ function createGrid(gridSize) {
     }
   }
 
-  // Shuffle
+  // Shuffle pieces
   pieces.sort(() => Math.random() - 0.5);
   pieces.forEach((p, i) => {
     p.col = i % gridSize;
@@ -128,9 +133,10 @@ function drawPuzzle(ctx, gridSize) {
     );
   });
 }
-
 function setupDragAndDrop(ctx, gridSize) {
   const canvas = ctx.canvas;
+
+  // Mouse Down — pick up a piece
   canvas.onmousedown = e => {
     const mousePos = getMousePos(canvas, e);
     const clickedPiece = getPieceAt(mousePos, gridSize);
@@ -141,6 +147,8 @@ function setupDragAndDrop(ctx, gridSize) {
       offsetY = mousePos.y - draggingPiece.row * pieceSize;
     }
   };
+
+  // Mouse Move — drag the piece
   canvas.onmousemove = e => {
     if (draggingPiece) {
       const mousePos = getMousePos(canvas, e);
@@ -149,6 +157,8 @@ function setupDragAndDrop(ctx, gridSize) {
       drawPuzzle(ctx, gridSize);
     }
   };
+
+  // Mouse Up — drop the piece
   canvas.onmouseup = e => {
     if (draggingPiece) {
       const dropCol = Math.round(draggingPiece.col);
@@ -158,7 +168,7 @@ function setupDragAndDrop(ctx, gridSize) {
       draggingPiece.col = dropCol;
       draggingPiece.row = dropRow;
 
-      // Check if correct position
+      // Lock if correct
       if (dropCol === draggingPiece.correctCol && dropRow === draggingPiece.correctRow) {
         draggingPiece.locked = true;
       }
@@ -184,6 +194,7 @@ function getPieceAt(pos, gridSize) {
 }
 function checkCompletion(gridSize) {
   const allLocked = pieces.every(p => p.locked);
+
   if (allLocked) {
     clearInterval(timer);
     completionSounds[currentLevel].play();
@@ -202,6 +213,7 @@ function startTimer() {
   const timerDisplay = document.getElementById('timerDisplay');
   timerDisplay.textContent = `Time: ${timeLeft}`;
 
+  clearInterval(timer);
   timer = setInterval(() => {
     timeLeft--;
     timerDisplay.textContent = `Time: ${timeLeft}`;
@@ -221,7 +233,6 @@ function startTimer() {
     }
   }, 1000);
 }
-// Optional: Reset game state if needed
 function resetGame() {
   clearInterval(timer);
   pieces = [];
@@ -241,4 +252,3 @@ document.addEventListener('keydown', e => {
 </script>
 </body>
 </html>
-
