@@ -73,8 +73,15 @@
 <script>
   // 🎵 Sound effects
   const startSound = new Audio('start.mp3');
-  const successSound = new Audio('success.mp3');
   const failSound = new Audio('fail.mp3');
+
+  // Completion sounds for each puzzle
+  const completionSounds = [
+    new Audio('sound1.mp3'),
+    new Audio('sound2.mp3'),
+    new Audio('sound3.mp3'),
+    new Audio('sound4.mp3')
+  ];
 
   // Level data
   const levels = [
@@ -145,6 +152,7 @@
       }
     }, 1000);
   }
+
   function createGrid(gridSize) {
     const ctx = document.getElementById('gameCanvas').getContext('2d');
     const canvas = ctx.canvas;
@@ -233,6 +241,7 @@
     pieces.forEach(p => {
       if (p !== draggingPiece) {
         ctx.drawImage(
+          puzzle
           puzzleImage,
           p.correctCol * pieceSize, p.correctRow * pieceSize, pieceSize, pieceSize,
           p.col * pieceSize, p.row * pieceSize, pieceSize, pieceSize
@@ -249,6 +258,7 @@
     );
     ctx.globalAlpha = 1;
   }
+
   function endDrag(e, ctx, gridSize) {
     if (!draggingPiece) return;
 
@@ -334,14 +344,13 @@
         // Check if puzzle is solved
         if (pieces.every(p => p.locked)) {
           clearInterval(timer);
-          successSound.play();
+          completionSounds[currentLevel].play(); // Play sound for this level
           setTimeout(() => {
             if (currentLevel < levels.length - 1) {
               currentLevel++;
               document.getElementById('nextScreen').style.display = 'flex';
             } else {
-              alert("🎉 Congratulations! You solved all puzzles!");
-              document.getElementById('startScreen').style.display = 'flex';
+              alert("🎉 Congratulations! You solved all puzzles document.getElementById('startScreen').style.display = 'flex';
             }
           }, 500);
         }
