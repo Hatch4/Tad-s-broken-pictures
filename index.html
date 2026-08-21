@@ -66,23 +66,24 @@ let puzzleImage = new Image();
 let timer;
 let timeLeft;
 let draggedPiece = null;
+let gameStartedOnce = false;
 
-// Optional sounds (won’t break if missing)
-const startSound = new Audio("start.mp3");
-startSound.onerror = () => null;
-
+// Optional sounds
+const startSound = new Audio("start.mp3"); startSound.onerror = () => null;
+const successSound = new Audio("success.mp3"); successSound.onerror = () => null;
 const completionSounds = [
   new Audio("sound1.mp3"),
   new Audio("sound2.mp3"),
   new Audio("sound3.mp3"),
   new Audio("sound4.mp3")
 ].map(s => { s.onerror = () => null; return s; });
-
-const failSound = new Audio("fail.mp3");
-failSound.onerror = () => null;
+const failSound = new Audio("fail.mp3"); failSound.onerror = () => null;
 
 function startLevel(levelIndex) {
-  if (startSound) startSound.play(); // Play start sound on first click
+  if (!gameStartedOnce) {
+    if (startSound) startSound.play();
+    gameStartedOnce = true;
+  }
 
   currentLevel = levelIndex;
   document.getElementById('startScreen').style.display = 'none';
@@ -99,7 +100,6 @@ function createGrid(gridSize) {
   const canvas = document.getElementById('gameCanvas');
   pieceSize = canvas.width / gridSize;
 
-  // Create ordered grid
   pieces = [];
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
@@ -107,7 +107,8 @@ function createGrid(gridSize) {
         correctRow: row,
         correctCol: col,
         currentRow: row,
-        currentCol: col
+        currentCol: col,
+        locked: false
       });
     }
   }
@@ -139,11 +140,6 @@ function shufflePieces() {
 function drawPuzzle() {
   const ctx = document.getElementById('gameCanvas').getContext('2d');
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-  // Draw pond background
-  const pond = new Image();
-  pond.src = 'pond.png';
-  ctx.drawImage(pond, 0, 0, ctx.canvas.width, ctx.canvas.height);
 
   // Draw all pieces except the one being dragged
   pieces.forEach(piece => {
@@ -183,10 +179,11 @@ function enableDragAndDrop(gridSize) {
 
   function startDrag(e) {
     const pos = getMousePos(canvas, e);
-    draggedPiece = getPieceAtGrid(pos, gridSize);
-    if (draggedPiece) {
-      draggedPiece.originalRow = draggedPiece.currentRow;
-      draggedPiece.originalCol = draggedPiece.currentCol;
+    const piece = getPieceAtGrid(pos, gridSize);
+    if (piece && !piece.locked) {
+      draggedPiece = piece;
+      draggedPiece.originalRow = piece.currentRow;
+      draggedPiece.originalCol = piece.currentCol;
     }
   }
 
@@ -203,20 +200,46 @@ function enableDragAndDrop(gridSize) {
     const pos = getMousePos(canvas, e);
     const targetPiece = getPieceAtGrid(pos, gridSize);
 
-        if (targetPiece && targetPiece !== draggedPiece) {
-      // Swap positions
-      const tempRow = targetPiece.currentRow;
-      const tempCol = targetPiece.currentCol;
+    if (targetPiece && targetPiece !== draggedPiece) {
+      if (targetPiece.locked) {
+        // Can't swap with a locked piece — snap back
+        draggedPiece.currentRow = draggedPiece.originalRow;
+        draggedPiece.currentCol = draggedPiece.originalCol;
+      } else {
+        // Swap positions
+        const tempRow = targetPiece.currentRow;
+        const tempCol = targetPiece.currentCol;
 
-      targetPiece.currentRow = draggedPiece.originalRow;
-      targetPiece.currentCol = draggedPiece.originalCol;
+        targetPiece.currentRow = draggedPiece.originalRow;
+        targetPiece.currentCol = draggedPiece.originalCol;
 
-      draggedPiece.currentRow = tempRow;
-      draggedPiece.currentCol = tempCol;
+        draggedPiece.currentRow = tempRow;
+        draggedPiece.currentCol = tempCol;
+      }
     } else {
-      // Snap back to original position if not dropped on another piece
-      draggedPiece.currentRow = draggedPiece.originalRow;
-      draggedPiece.currentCol = draggedPiece.originalCol;
+      // Dropped on empty space — stay where dropped
+      // (No snap back unless it's invalid)
+    }
+
+    // Check if dragged piece is now in correct position
+    if (
+      draggedPiece.currentRow === draggedPiece.correctRow &&
+      draggedPiece.currentCol === draggedPiece.correctCol &&
+      !draggedPiece.locked
+    ) {
+      draggedPiece.locked = true;
+      if (successSound) successSound.play();
+    }
+
+    // Also check if target piece is now correct
+    if (
+      targetPiece &&
+      targetPiece.currentRow === targetPiece.correctRow &&
+      targetPiece.currentCol === targetPiece.correctCol &&
+      !targetPiece.locked
+    ) {
+      targetPiece.locked = true;
+      if (successSound) successSound.play();
     }
 
     draggedPiece = null;
@@ -257,7 +280,7 @@ function startTimer() {
 }
 
 function checkCompletion() {
-  const allCorrect = pieces.every(p => p.currentRow === p.correctRow && p.currentCol === p.correctCol);
+  const allCorrect = pieces.every(p => p.locked);
   if (allCorrect) {
     clearInterval(timer);
     if (completionSounds[currentLevel]) completionSounds[currentLevel].play();
