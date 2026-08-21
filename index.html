@@ -51,6 +51,7 @@
   <canvas id="gameCanvas" width="400" height="400"></canvas>
   <button id="nextButton" style="display:none; margin-top:10px;" onclick="goToNextLevel()">Next Puzzle</button>
 </div>
+
 <script>
 const levels = [
   { img: 'image1.png', size: 2, time: 10 },
@@ -68,7 +69,7 @@ let timeLeft;
 let draggedPiece = null;
 let gameStartedOnce = false;
 
-// Optional sounds
+// Sounds
 const startSound = new Audio("start.mp3"); startSound.onerror = () => null;
 const successSound = new Audio("success.mp3"); successSound.onerror = () => null;
 const completionSounds = [
@@ -96,6 +97,7 @@ function startLevel(levelIndex) {
     createGrid(size);
   };
 }
+
 function createGrid(gridSize) {
   const canvas = document.getElementById('gameCanvas');
   pieceSize = canvas.width / gridSize;
@@ -195,42 +197,43 @@ function enableDragAndDrop(gridSize) {
     drawPuzzle();
   }
 
-function endDrag(e) {
-  if (!draggedPiece) return;
-  const pos = getMousePos(canvas, e);
-  const targetPiece = getPieceAtGrid(pos, gridSize);
+  function endDrag(e) {
+    if (!draggedPiece) return;
+    const pos = getMousePos(canvas, e);
+    const targetPiece = getPieceAtGrid(pos, gridSize);
 
-  if (targetPiece && targetPiece !== draggedPiece) {
-    if (targetPiece.locked) {
-      // Can't swap with a locked piece — snap back
-      draggedPiece.currentRow = draggedPiece.originalRow;
-      draggedPiece.currentCol = draggedPiece.originalCol;
-    } else {
-      // Swap positions
-      const tempRow = targetPiece.currentRow;
-      const tempCol = targetPiece.currentCol;
+    if (targetPiece && targetPiece !== draggedPiece) {
+      if (targetPiece.locked) {
+        // Can't swap with a locked piece — snap back
+        draggedPiece.currentRow = draggedPiece.originalRow;
+        draggedPiece.currentCol = draggedPiece.originalCol;
+       } else {
+        // Swap positions
+        const tempRow = targetPiece.currentRow;
+        const tempCol = targetPiece.currentCol;
 
-      targetPiece.currentRow = draggedPiece.originalRow;
-      targetPiece.currentCol = draggedPiece.originalCol;
+        targetPiece.currentRow = draggedPiece.originalRow;
+        targetPiece.currentCol = draggedPiece.originalCol;
 
-      draggedPiece.currentRow = tempRow;
-      draggedPiece.currentCol = tempCol;
+        draggedPiece.currentRow = tempRow;
+        draggedPiece.currentCol = tempCol;
+      }
     }
-  }
 
-  // ✅ Only lock the dragged piece if it's correct
-  if (
-    draggedPiece.currentRow === draggedPiece.correctRow &&
-    draggedPiece.currentCol === draggedPiece.correctCol &&
-    !draggedPiece.locked
-  ) {
-    draggedPiece.locked = true;
-    if (successSound) successSound.play();
-  }
+    // ✅ Only lock the dragged piece if it's correct
+    if (
+      draggedPiece.currentRow === draggedPiece.correctRow &&
+      draggedPiece.currentCol === draggedPiece.correctCol &&
+      !draggedPiece.locked
+    ) {
+      draggedPiece.locked = true;
+      if (successSound) successSound.play();
+    }
 
-  draggedPiece = null;
-  drawPuzzle();
-  checkCompletion();
+    draggedPiece = null;
+    drawPuzzle();
+    checkCompletion();
+  }
 }
 
 function getMousePos(canvas, evt) {
@@ -300,3 +303,4 @@ document.addEventListener('keydown', e => {
 </script>
 </body>
 </html>
+
