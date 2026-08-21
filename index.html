@@ -217,74 +217,107 @@
     };
   }
 
-  function startDrag(e, ctx, gridSize) {
-    const mousePos = getMousePos(ctx.canvas, e);
-    const col = Math.floor(mousePos.x / pieceSize);
-    const row = Math.floor(mousePos.y / pieceSize);
+function endDrag(e, ctx, gridSize) {
+  if (!draggingPiece) return;
 
-    draggingPiece = pieces.find(p => p.col === col && p.row === row && !p.locked);
-    if (draggingPiece) {
-      offsetX = mousePos.x - col * pieceSize;
-      offsetY = mousePos.y - row * pieceSize;
-    }
+  const mousePos = getMousePos(ctx.canvas, e);
+  const dropCol = Math.floor(mousePos.x / pieceSize);
+  const dropRow = Math.floor(mousePos.y / pieceSize);
+
+  const targetPiece = pieces.find(p => p.col === dropCol && p.row === dropRow);
+
+  if (targetPiece && targetPiece !== draggingPiece && !targetPiece.locked) {
+    animateSwap(ctx, gridSize, draggingPiece, targetPiece);
+  } else {
+    drawPuzzle(ctx, gridSize); // Snap back if invalid
   }
 
-  function drag(e, ctx, gridSize) {
-    if (!draggingPiece) return;
-    const mousePos = getMousePos(ctx.canvas, e);
-    drawPuzzle(ctx, gridSize);
+  draggingPiece = null;
+}
 
-    // Draw dragged piece following mouse
-    ctx.globalAlpha = 0.8;
-    ctx.drawImage(
-      puzzleImage,
-      draggingPiece.correctCol * pieceSize, draggingPiece.correctRow * pieceSize, pieceSize, pieceSize,
-      mousePos.x - offsetX, mousePos.y - offsetY, pieceSize, pieceSize
-    );
-    ctx.globalAlpha = 1;
-  }
+function animateSwap(ctx, gridSize, pieceA, pieceB) {
+  const startAx = pieceA.col * pieceSize;
+  const startAy = pieceA.row * pieceSize;
+  const startBx = pieceB.col * pieceSize;
+  const startBy = pieceB.row * pieceSize;
 
-  function endDrag(e, ctx, gridSize) {
-    if (!draggingPiece) return;
+  const targetAx = pieceB.col * pieceSize;
+  const targetAy = pieceB.row * pieceSize;
+  const targetBx = pieceA.col * pieceSize;
+  const targetBy = pieceA.row * pieceSize;
 
-    const mousePos = getMousePos(ctx.canvas, e);
-    const dropCol = Math.floor(mousePos.x / pieceSize);
-    const dropRow = Math.floor(mousePos.y / pieceSize);
+  const duration = 200; // ms
+  let startTime = null;
 
-    // Find piece currently in drop location
-    const targetPiece = pieces.find(p => p.col === dropCol && p.row === dropRow);
+  function animate(time) {
+    if (!startTime) startTime = time;
+    const progress = Math.min((time - startTime) / duration, 1);
 
-    if (targetPiece && targetPiece !== draggingPiece && !targetPiece.locked) {
-      // Swap positions
-      [draggingPiece.col, targetPiece.col] = [targetPiece.col, draggingPiece.col];
-      [draggingPiece.row, targetPiece.row] = [targetPiece.row, draggingPiece.row];
-    }
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    // Lock correct pieces
+    // Draw all pieces except the two moving ones
     pieces.forEach(p => {
-      if (p.col === p.correctCol && p.row === p.correctRow) {
-        p.locked = true;
+      if (p !== pieceA && p !== pieceB) {
+        ctx.drawImage(
+          puzzleImage,
+          p.correctCol * pieceSize, p.correctRow * pieceSize, pieceSize, pieceSize,
+          p.col * pieceSize, p.row * pieceSize, pieceSize, pieceSize
+        );
       }
     });
 
-    drawPuzzle(ctx, gridSize);
-    draggingPiece = null;
+    // Draw moving pieces interpolated
+    ctx.drawImage(
+      puzzleImage,
+      pieceA.correctCol * pieceSize, pieceA.correctRow * pieceSize, pieceSize, pieceSize,
+      startAx + (targetAx - startAx) * progress,
+      startAy + (targetAy - startAy) * progress,
+      pieceSize, pieceSize
+    );
 
-    // Check if puzzle is solved
-    if (pieces.every(p => p.locked)) {
-      clearInterval(timer);
-      successSound.play();
-      setTimeout(() => {
-        if (currentLevel < levels.length - 1) {
-          currentLevel++;
-          document.getElementById('nextScreen').style.display = 'flex';
-        } else {
-          alert("🎉 Congratulations! You solved all puzzles!");
-          document.getElementById('startScreen').style.display = 'flex';
+    ctx.drawImage(
+      puzzleImage,
+      pieceB.correctCol * pieceSize, pieceB.correctRow * pieceSize, pieceSize, pieceSize,
+      startBx + (targetBx - startBx) * progress,
+      startBy + (targetBy - startBy) * progress,
+      pieceSize, pieceSize
+    );
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      // Swap positions in data
+      [pieceA.col, pieceB.col] = [pieceB.col, pieceA.col];
+      [pieceA.row, pieceB.row] = [pieceB.row, pieceA.row];
+
+      // Lock correct pieces
+      pieces.forEach(p => {
+        if (p.col === p.correctCol && p.row === p.correctRow) {
+          p.locked = true;
         }
-      }, 500);
+      });
+
+      drawPuzzle(ctx, gridSize);
+
+      // Check if puzzle is solved
+      if (pieces.every(p => p.locked)) {
+        clearInterval(timer);
+        successSound.play();
+        setTimeout(() => {
+          if (currentLevel < levels.length - 1) {
+            currentLevel++;
+            document.getElementById('nextScreen').style.display = 'flex';
+          } else {
+            alert("🎉 Congratulations! You solved all puzzles!");
+            document.getElementById('startScreen').style.display = 'flex';
+          }
+        }, 500);
+      }
     }
   }
+
+  requestAnimationFrame(animate);
+}
 </script>
 </body>
 </html>
