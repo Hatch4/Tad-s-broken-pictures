@@ -25,7 +25,7 @@
   #gameCanvas {
     border: 4px solid #333;
     background: #88cc88;
-    touch-action: none;
+    touch-action: none; /* ✅ Prevent scrolling on touch devices */
   }
   #timerDisplay {
     font-size: 20px;
@@ -73,7 +73,7 @@ let scrambleTimeout;
 let failCounts = {}; // Track fails per level
 let gridSize;
 
-// Sounds (optional)
+// Optional sounds (leave empty if not used)
 const startSound = new Audio("start.mp3"); startSound.onerror = () => null;
 const successSound = new Audio("success.mp3"); successSound.onerror = () => null;
 const completionSounds = [
@@ -193,6 +193,9 @@ function drawPuzzle(isDragging = false) {
 function enableDragAndDrop(size) {
   const canvas = document.getElementById('gameCanvas');
 
+  // Prevent scrolling on touch devices
+  canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
   canvas.onmousedown = e => startDrag(e);
   canvas.onmouseup = e => endDrag(e);
   canvas.onmousemove = e => dragMove(e);
@@ -203,7 +206,7 @@ function enableDragAndDrop(size) {
 
   function startDrag(e) {
     const pos = getMousePos(canvas, e);
-    const piece = getPieceAtGrid(pos, size);
+    const piece = getPieceAtGrid(pos, size, canvas);
     if (piece && !piece.locked) {
       draggedPiece = piece;
       draggedPiece.originalRow = piece.currentRow;
@@ -228,19 +231,17 @@ function enableDragAndDrop(size) {
   function endDrag(e) {
     if (!draggedPiece) return;
     const pos = getMousePos(canvas, e);
-    const targetPiece = getPieceAtGrid(pos, size);
+    const targetPiece = getPieceAtGrid(pos, size, canvas);
 
-    if (targetPiece && targetPiece !== draggedPiece) {
-      if (!targetPiece.locked) {
-        const tempRow = targetPiece.currentRow;
-        const tempCol = targetPiece.currentCol;
+    if (targetPiece && targetPiece !== draggedPiece && !targetPiece.locked) {
+      const tempRow = targetPiece.currentRow;
+      const tempCol = targetPiece.currentCol;
 
-        targetPiece.currentRow = draggedPiece.originalRow;
-        targetPiece.currentCol = draggedPiece.originalCol;
+      targetPiece.currentRow = draggedPiece.originalRow;
+      targetPiece.currentCol = draggedPiece.originalCol;
 
-        draggedPiece.currentRow = tempRow;
-        draggedPiece.currentCol = tempCol;
-      }
+      draggedPiece.currentRow = tempRow;
+      draggedPiece.currentCol = tempCol;
     }
 
     // Lock dragged piece if correct
@@ -278,12 +279,11 @@ function getMousePos(canvas, evt) {
   };
 }
 
-function getPieceAtGrid(pos, size) {
+function getPieceAtGrid(pos, size, canvas) {
   const col = Math.floor(pos.x / (canvas.width / size));
   const row = Math.floor(pos.y / (canvas.height / size));
   return pieces.find(p => p.currentRow === row && p.currentCol === col);
 }
-
 function startTimer() {
   const { time } = levels[currentLevel];
   timeLeft = time;
@@ -347,5 +347,4 @@ document.addEventListener('keydown', e => {
 </script>
 </body>
 </html>
-
 
