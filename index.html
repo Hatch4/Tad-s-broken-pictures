@@ -10,14 +10,13 @@
       color: white;
       text-align: center;
     }
-    #startScreen {
+    #startScreen, #nextScreen {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: url('pond.png') no-repeat center center;
-      background-size: cover;
+      background: rgba(0,0,0,0.8);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -26,16 +25,13 @@
     }
     #startScreen img {
       width: 150px;
-      height: auto;
       margin-bottom: 20px;
     }
-    #startScreen h1 {
+    h1 {
       font-size: 3em;
-      color: white;
-      text-shadow: 2px 2px 4px black;
       margin-bottom: 20px;
     }
-    #startButton {
+    button {
       padding: 15px 30px;
       font-size: 1.5em;
       background-color: #4CAF50;
@@ -43,9 +39,8 @@
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
     }
-    #startButton:hover {
+    button:hover {
       background-color: #45a049;
     }
     #timerDisplay {
@@ -68,24 +63,24 @@
   <button id="startButton">Start Game</button>
 </div>
 
+<div id="nextScreen" style="display:none;">
+  <h1>Level Complete!</h1>
+  <button id="nextButton">Next Puzzle</button>
+</div>
+
 <div id="timerDisplay">Time: 0</div>
 <canvas id="gameCanvas" width="600" height="600"></canvas>
 <script>
-  // Load start sound
-  let startSound = new Audio('start.mp3');
+  // 🎵 Sound effects
+  const startSound = new Audio('start.mp3');
+  const successSound = new Audio('success.mp3');
+  const failSound = new Audio('fail.mp3');
 
-  // Try autoplay on page load
+  // Try autoplay on load
   window.addEventListener('load', () => {
     startSound.play().catch(() => {
-      console.log("Autoplay blocked, will play on button click.");
+      console.log("Autoplay blocked, will play on click.");
     });
-  });
-
-  // Start button click
-  document.getElementById('startButton').addEventListener('click', () => {
-    startSound.play();
-    document.getElementById('startScreen').style.display = 'none';
-    startGame();
   });
 
   // Level data
@@ -101,9 +96,22 @@
   let timeLeft;
   let puzzleImage = new Image();
   let pieces = [];
-  let pieceWidth, pieceHeight;
+  let pieceSize;
   let draggingPiece = null;
   let offsetX, offsetY;
+
+  // Start button
+  document.getElementById('startButton').addEventListener('click', () => {
+    startSound.play();
+    document.getElementById('startScreen').style.display = 'none';
+    startGame();
+  });
+
+  // Next button
+  document.getElementById('nextButton').addEventListener('click', () => {
+    document.getElementById('nextScreen').style.display = 'none';
+    startLevel(currentLevel);
+  });
 
   function startGame() {
     currentLevel = 0;
@@ -116,8 +124,15 @@
     document.getElementById('timerDisplay').textContent = "Time: " + timeLeft;
 
     puzzleImage.onload = function() {
-      createGrid(level.grid);
-      startTimer();
+      // 2-second reveal before scrambling
+      const ctx = document.getElementById('gameCanvas').getContext('2d');
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.drawImage(puzzleImage, 0, 0, ctx.canvas.width, ctx.canvas.height);
+
+      setTimeout(() => {
+        createGrid(level.grid);
+        startTimer();
+      }, 2000);
     };
     puzzleImage.src = level.src;
   }
@@ -129,7 +144,11 @@
       document.getElementById('timerDisplay').textContent = "Time: " + timeLeft;
       if (timeLeft <= 0) {
         clearInterval(timer);
-        gameOver();
+        failSound.play();
+        setTimeout(() => {
+          alert("⏳ Time's up! Try again.");
+          startLevel(currentLevel); // Restart same level
+        }, 500);
       }
     }, 1000);
   }
@@ -137,8 +156,8 @@
     const ctx = document.getElementById('gameCanvas').getContext('2d');
     const canvas = ctx.canvas;
 
-    pieceWidth = canvas.width / gridSize;
-    pieceHeight = canvas.height / gridSize;
+    // Ensure perfect square pieces
+    pieceSize = Math.floor(canvas.width / gridSize);
 
     // Create pieces with correct positions
     pieces = [];
@@ -172,8 +191,8 @@
     pieces.forEach(p => {
       ctx.drawImage(
         puzzleImage,
-        p.correctCol * pieceWidth, p.correctRow * pieceHeight, pieceWidth, pieceHeight,
-        p.col * pieceWidth, p.row * pieceHeight, pieceWidth, pieceHeight
+        p.correctCol * pieceSize, p.correctRow * pieceSize, pieceSize, pieceSize,
+        p.col * pieceSize, p.row * pieceSize, pieceSize, pieceSize
       );
     });
   }
@@ -200,13 +219,13 @@
 
   function startDrag(e, ctx, gridSize) {
     const mousePos = getMousePos(ctx.canvas, e);
-    const col = Math.floor(mousePos.x / pieceWidth);
-    const row = Math.floor(mousePos.y / pieceHeight);
+    const col = Math.floor(mousePos.x / pieceSize);
+    const row = Math.floor(mousePos.y / pieceSize);
 
     draggingPiece = pieces.find(p => p.col === col && p.row === row && !p.locked);
     if (draggingPiece) {
-      offsetX = mousePos.x - col * pieceWidth;
-      offsetY = mousePos.y - row * pieceHeight;
+      offsetX = mousePos.x - col * pieceSize;
+      offsetY = mousePos.y - row * pieceSize;
     }
   }
 
@@ -219,8 +238,8 @@
     ctx.globalAlpha = 0.8;
     ctx.drawImage(
       puzzleImage,
-      draggingPiece.correctCol * pieceWidth, draggingPiece.correctRow * pieceHeight, pieceWidth, pieceHeight,
-      mousePos.x - offsetX, mousePos.y - offsetY, pieceWidth, pieceHeight
+      draggingPiece.correctCol * pieceSize, draggingPiece.correctRow * pieceSize, pieceSize, pieceSize,
+      mousePos.x - offsetX, mousePos.y - offsetY, pieceSize, pieceSize
     );
     ctx.globalAlpha = 1;
   }
@@ -229,8 +248,8 @@
     if (!draggingPiece) return;
 
     const mousePos = getMousePos(ctx.canvas, e);
-    const dropCol = Math.floor(mousePos.x / pieceWidth);
-    const dropRow = Math.floor(mousePos.y / pieceHeight);
+    const dropCol = Math.floor(mousePos.x / pieceSize);
+    const dropRow = Math.floor(mousePos.y / pieceSize);
 
     // Find piece currently in drop location
     const targetPiece = pieces.find(p => p.col === dropCol && p.row === dropRow);
@@ -239,11 +258,9 @@
       // Swap positions
       [draggingPiece.col, targetPiece.col] = [targetPiece.col, draggingPiece.col];
       [draggingPiece.row, targetPiece.row] = [targetPiece.row, draggingPiece.row];
-    } else {
-      // Snap back to original position
     }
 
-    // Lock if correct
+    // Lock correct pieces
     pieces.forEach(p => {
       if (p.col === p.correctCol && p.row === p.correctRow) {
         p.locked = true;
@@ -256,21 +273,17 @@
     // Check if puzzle is solved
     if (pieces.every(p => p.locked)) {
       clearInterval(timer);
+      successSound.play();
       setTimeout(() => {
-        currentLevel++;
-        if (currentLevel < levels.length) {
-          startLevel(currentLevel);
+        if (currentLevel < levels.length - 1) {
+          currentLevel++;
+          document.getElementById('nextScreen').style.display = 'flex';
         } else {
           alert("🎉 Congratulations! You solved all puzzles!");
-          startGame();
+          document.getElementById('startScreen').style.display = 'flex';
         }
       }, 500);
     }
-  }
-
-  function gameOver() {
-    alert("⏳ Time's up! Try again.");
-    startGame();
   }
 </script>
 </body>
