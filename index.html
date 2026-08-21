@@ -68,6 +68,9 @@ let timeLeft;
 let draggedPiece = null;
 
 // Optional sounds (won’t break if missing)
+const startSound = new Audio("start.mp3");
+startSound.onerror = () => null;
+
 const completionSounds = [
   new Audio("sound1.mp3"),
   new Audio("sound2.mp3"),
@@ -79,6 +82,8 @@ const failSound = new Audio("fail.mp3");
 failSound.onerror = () => null;
 
 function startLevel(levelIndex) {
+  if (startSound) startSound.play(); // Play start sound on first click
+
   currentLevel = levelIndex;
   document.getElementById('startScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'flex';
@@ -179,6 +184,10 @@ function enableDragAndDrop(gridSize) {
   function startDrag(e) {
     const pos = getMousePos(canvas, e);
     draggedPiece = getPieceAtGrid(pos, gridSize);
+    if (draggedPiece) {
+      draggedPiece.originalRow = draggedPiece.currentRow;
+      draggedPiece.originalCol = draggedPiece.currentCol;
+    }
   }
 
   function dragMove(e) {
@@ -194,11 +203,22 @@ function enableDragAndDrop(gridSize) {
     const pos = getMousePos(canvas, e);
     const targetPiece = getPieceAtGrid(pos, gridSize);
 
-    if (targetPiece && targetPiece !== draggedPiece) {
-      [draggedPiece.currentRow, targetPiece.currentRow] = [targetPiece.currentRow, draggedPiece.currentRow];
-      [draggedPiece.currentCol, targetPiece.currentCol]
-      [draggedPiece.currentCol, targetPiece.currentCol] = [targetPiece.currentCol, draggedPiece.currentCol];
+        if (targetPiece && targetPiece !== draggedPiece) {
+      // Swap positions
+      const tempRow = targetPiece.currentRow;
+      const tempCol = targetPiece.currentCol;
+
+      targetPiece.currentRow = draggedPiece.originalRow;
+      targetPiece.currentCol = draggedPiece.originalCol;
+
+      draggedPiece.currentRow = tempRow;
+      draggedPiece.currentCol = tempCol;
+    } else {
+      // Snap back to original position if not dropped on another piece
+      draggedPiece.currentRow = draggedPiece.originalRow;
+      draggedPiece.currentCol = draggedPiece.originalCol;
     }
+
     draggedPiece = null;
     drawPuzzle();
     checkCompletion();
