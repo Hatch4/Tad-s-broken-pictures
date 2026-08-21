@@ -2,227 +2,244 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Image Unscramble Puzzle</title>
+<title>Tad's Broken Pictures</title>
 <style>
-  body { font-family: Arial, sans-serif; text-align: center; background: #f0f0f0; }
-  #gameCanvas { background: #fff; border: 2px solid #333; display: block; margin: 20px auto; touch-action: none; }
-  #timer { font-size: 20px; margin: 10px; }
-  #nextBtn { display: none; padding: 10px 20px; font-size: 18px; margin-top: 10px; }
-  #clue { font-size: 18px; margin-top: 10px; }
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: black;
+  }
+  /* Start Screen Styles */
+  #startScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('pond.png') no-repeat center center;
+    background-size: cover;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+  #startScreen h1 {
+    font-size: 3em;
+    color: white;
+    text-shadow: 2px 2px 4px black;
+    margin-bottom: 20px;
+  }
+  #startButton {
+    padding: 15px 30px;
+    font-size: 1.5em;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+  }
+  #startButton:hover {
+    background-color: #45a049;
+  }
 </style>
 </head>
 <body>
 
-<h1>Image Unscramble Puzzle</h1>
-<div id="timer">Time: 0</div>
-<canvas id="gameCanvas" width="500" height="500"></canvas>
-<div id="clue"></div>
-<button id="nextBtn">Next</button>
+<!-- Start Screen -->
+<div id="startScreen">
+  <h1>Tad's Broken Pictures</h1>
+  <button id="startButton">Start Game</button>
+</div>
+
+<!-- Game Canvas -->
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="timerDisplay" style="color:white; font-size:20px; padding:10px;">Time: 0</div>
 
 <script>
-// ======== CONFIG & VARIABLES ========
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const timerDisplay = document.getElementById('timer');
-const nextBtn = document.getElementById('nextBtn');
-const clueDisplay = document.getElementById('clue');
-let failCount = 0; // Track fails per level
+  // Start screen sound
+  let startSound = new Audio('start.mp3');
 
-const levels = [
-  { img: 'image1.png', grid: 2, time: 10, clue: 'Clue from Image 1', sound: 'sound1.mp3' },
-  { img: 'image2.png', grid: 3, time: 35, clue: 'Clue from Image 2', sound: 'sound2.mp3' },
-  { img: 'image3.png', grid: 4, time: 50, clue: 'Clue from Image 3', sound: 'sound3.mp3' },
-  { img: 'image4.png', grid: 5, time: 75, clue: 'Clue from Image 4', sound: 'sound4.mp3' }
-];
-
-let currentLevel = 0;
-let pieces = [];
-let pieceSize;
-let draggingPiece = null;
-let offsetX, offsetY;
-let timer, timeLeft;
-let imgObj = new Image();
-
-// ======== LEVEL SETUP WITH PREVIEW ========
-function startLevel(levelIndex) {
-  currentLevel = levelIndex;
-  clueDisplay.textContent = '';
-  nextBtn.style.display = 'none';
-  imgObj.src = levels[levelIndex].img;
-  imgObj.onload = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(imgObj, 0, 0, canvas.width, canvas.height);
-    timerDisplay.textContent = "Preview...";
-    setTimeout(() => {
-      setupPieces();
-      if (failCount < 2) {
-        startTimer(levels[levelIndex].time);
-      } else {
-        timerDisplay.textContent = "No Timer Mode";
-      }
-    }, 2000);
-  };
-}
-
-function setupPieces() {
-  const grid = levels[currentLevel].grid;
-  pieceSize = canvas.width / grid;
-  pieces = [];
-
-  for (let y = 0; y < grid; y++) {
-    for (let x = 0; x < grid; x++) {
-      pieces.push({
-        correctX: x * pieceSize,
-        correctY: y * pieceSize,
-        x: Math.random() * (canvas.width - pieceSize),
-        y: Math.random() * (canvas.height - pieceSize),
-        row: y,
-        col: x,
-        locked: false
-      });
-    }
-  }
-  drawPieces();
-}
-
-function drawPieces() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  pieces.forEach(p => {
-    ctx.drawImage(
-      imgObj,
-      p.col * pieceSize, p.row * pieceSize, pieceSize, pieceSize,
-      p.x, p.y, pieceSize, pieceSize
-    );
-    ctx.strokeRect(p.x, p.y, pieceSize, pieceSize);
+  // Play sound when page loads
+  window.addEventListener('load', () => {
+    startSound.play().catch(() => {
+      console.log("Autoplay blocked, will play on button click.");
+    });
   });
-}
 
-  // ======== TIMER ========
-function startTimer(seconds) {
-  timeLeft = seconds;
-  timerDisplay.textContent = `Time: ${timeLeft}`;
-  clearInterval(timer);
-  timer = setInterval(() => {
-    timeLeft--;
-    timerDisplay.textContent = `Time: ${timeLeft}`;
-    if (timeLeft <= 0) {
-      clearInterval(timer);
+  // Start button click
+  document.getElementById('startButton').addEventListener('click', () => {
+    startSound.pause();
+    startSound.currentTime = 0;
+    document.getElementById('startScreen').style.display = 'none';
+    startGame();
+  });
 
-      // Play fail sound
-      let failAudio = new Audio('fail.mp3');
-      failAudio.play();
+  // Game start
+  function startGame() {
+    currentLevel = 0;
+    startLevel(currentLevel);
+  }
 
-      failCount++;
+  // Level data
+  const levels = [
+    { src: 'image1.png', grid: 2, time: 10 },
+    { src: 'image2.png', grid: 3, time: 35 },
+    { src: 'image3.png', grid: 4, time: 50 },
+    { src: 'image4.png', grid: 5, time: 75 }
+  ];
 
-      if (failCount >= 2) {
-        alert('Timer removed for this level so you can finish!');
-        startLevel(currentLevel); // Restart without timer
-      } else {
-        alert('Time up! Try again.');
-        startLevel(currentLevel);
+  let currentLevel = 0;
+  let timer;
+  let timeLeft;
+  let puzzleImage = new Image();
+
+  function startLevel(levelIndex) {
+    const level = levels[levelIndex];
+    timeLeft = level.time;
+    document.getElementById('timerDisplay').textContent = "Time: " + timeLeft;
+
+    puzzleImage.onload = function() {
+      scrambleImage(level.grid);
+      startTimer();
+    };
+    puzzleImage.src = level.src;
+  }
+
+  function startTimer() {
+    clearInterval(timer);
+    timer = setInterval(() => {
+      timeLeft--;
+      document.getElementById('timerDisplay').textContent = "Time: " + timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        gameOver();
+      }
+    }, 1000);
+  }
+
+  // Puzzle state
+  let pieces = [];
+  let pieceWidth, pieceHeight;
+  let draggingPiece = null;
+  let offsetX, offsetY;
+
+  function scrambleImage(gridSize) {
+    const ctx = document.getElementById('gameCanvas').getContext('2d');
+    const canvas = ctx.canvas;
+
+    pieceWidth = canvas.width / gridSize;
+    pieceHeight = canvas.height / gridSize;
+
+    // Create pieces array
+    pieces = [];
+    for (let row = 0; row < gridSize; row++) {
+      for (let col = 0; col < gridSize; col++) {
+        pieces.push({
+          correctX: col * pieceWidth,
+          correctY: row * pieceHeight,
+          x: col * pieceWidth,
+          y: row * pieceHeight
+        });
       }
     }
-  }, 1000);
-}
 
-// ======== DRAG & DROP (Mouse + Touch) ========
-// Mouse events
-canvas.addEventListener('mousedown', e => startDrag(e));
-canvas.addEventListener('mousemove', e => dragMove(e));
-canvas.addEventListener('mouseup', () => endDrag());
+    // Shuffle pieces
+    pieces.sort(() => Math.random() - 0.5);
 
-// Touch events
-canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  startDrag(e.touches[0]);
-});
-canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  dragMove(e.touches[0]);
-});
-canvas.addEventListener('touchend', e => {
-  e.preventDefault();
-  endDrag();
-});
+    // Assign shuffled positions
+    pieces.forEach((p, i) => {
+      p.x = (i % gridSize) * pieceWidth;
+      p.y = Math.floor(i / gridSize) * pieceHeight;
+    });
 
-function startDrag(e) {
-  const mousePos = getMousePos(e);
-  for (let i = pieces.length - 1; i >= 0; i--) {
-    let p = pieces[i];
-    if (!p.locked &&
-        mousePos.x > p.x && mousePos.x < p.x + pieceSize &&
-        mousePos.y > p.y && mousePos.y < p.y + pieceSize) {
-      draggingPiece = p;
-      offsetX = mousePos.x - p.x;
-      offsetY = mousePos.y - p.y;
-      break;
+    drawPuzzle(ctx);
+    setupDragAndDrop(ctx, gridSize);
+  }
+
+  function drawPuzzle(ctx) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    pieces.forEach(p => {
+      ctx.drawImage(
+        puzzleImage,
+        p.correctX, p.correctY, pieceWidth, pieceHeight,
+        p.x, p.y, pieceWidth, pieceHeight
+      );
+    });
+  }
+
+  function setupDragAndDrop(ctx, gridSize) {
+    const canvas = ctx.canvas;
+
+    canvas.onmousedown = e => startDrag(e, ctx);
+    canvas.onmousemove = e => drag(e, ctx);
+    canvas.onmouseup = e => endDrag(e, ctx, gridSize);
+
+    // Touch support
+    canvas.ontouchstart = e => startDrag(e.touches[0], ctx);
+    canvas.ontouchmove = e => { e.preventDefault(); drag(e.touches[0], ctx); };
+    canvas.ontouchend = e => endDrag(e.changedTouches[0], ctx, gridSize);
+  }
+
+  function startDrag(e, ctx) {
+    const mousePos = getMousePos(ctx.canvas, e);
+    draggingPiece = pieces.find(p =>
+      mousePos.x > p.x && mousePos.x < p.x + pieceWidth &&
+      mousePos.y > p.y && mousePos.y < p.y + pieceHeight
+    );
+    if (draggingPiece) {
+      offsetX = mousePos.x - draggingPiece.x;
+      offsetY = mousePos.y - draggingPiece.y;
     }
   }
-}
 
-function dragMove(e) {
-  if (draggingPiece) {
-    const mousePos = getMousePos(e);
+  function drag(e, ctx) {
+    if (!draggingPiece) return;
+    const mousePos = getMousePos(ctx.canvas, e);
     draggingPiece.x = mousePos.x - offsetX;
     draggingPiece.y = mousePos.y - offsetY;
-    drawPieces();
+    drawPuzzle(ctx);
   }
-}
 
-function endDrag() {
-  if (draggingPiece) {
-    if (Math.abs(draggingPiece.x - draggingPiece.correctX) < 10 &&
-        Math.abs(draggingPiece.y - draggingPiece.correctY) < 10) {
-      draggingPiece.x = draggingPiece.correctX;
-      draggingPiece.y = draggingPiece.correctY;
-      draggingPiece.locked = true;
-    }
+  function endDrag(e, ctx, gridSize) {
+    if (!draggingPiece) return;
+    const snapX = Math.round(draggingPiece.x / pieceWidth) * pieceWidth;
+    const snapY = Math.round(draggingPiece.y / pieceHeight) * pieceHeight;
+    draggingPiece.x = snapX;
+    draggingPiece.y = snapY;
+    drawPuzzle(ctx);
     draggingPiece = null;
-    drawPieces();
-    checkLevelComplete();
+
+    // Check if puzzle is solved
+    if (pieces.every(p => p.x === p.correctX && p.y === p.correctY)) {
+      clearInterval(timer);
+      setTimeout(() => {
+        currentLevel++;
+        if (currentLevel < levels.length) {
+          startLevel(currentLevel);
+        } else {
+          alert("🎉 You completed all puzzles!");
+          document.getElementById('startScreen').style.display = 'flex';
+        }
+      }, 500);
+    }
   }
-}
 
-// ======== HELPER: Mouse/Touch Position ========
-function getMousePos(evt) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: evt.clientX - rect.left,
-    y: evt.clientY - rect.top
-  };
-}
-
-// ======== LEVEL COMPLETION ========
-function checkLevelComplete() {
-  if (pieces.every(p => p.locked)) {
-    clearInterval(timer);
-
-    // Reset fail count for next level
-    failCount = 0;
-
-    // Play the sound for this level
-    let audio = new Audio(levels[currentLevel].sound);
-    audio.play();
-
-    clueDisplay.textContent = levels[currentLevel].clue;
-    nextBtn.style.display = 'inline-block';
+  function getMousePos(canvas, e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
   }
-}
 
-// ======== NEXT BUTTON ========
-nextBtn.addEventListener('click', () => {
-  if (currentLevel < levels.length - 1) {
-    startLevel(currentLevel + 1);
-  } else {
-    alert('🎉 Congratulations! You completed all puzzles!');
-    startLevel(0);
+  function gameOver() {
+    alert('⏳ Time up!');
+    document.getElementById('startScreen').style.display = 'flex';
   }
-});
-
-// ======== START GAME ========
-startLevel(0);
 </script>
+
 </body>
 </html>
 
-  
