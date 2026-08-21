@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tad's Broken Pictures</title>
+
 <style>
   body { 
     font-family: sans-serif; 
@@ -12,6 +13,7 @@
     margin: 0; 
   }
 
+  /* Shared screen styling */
   #startScreen,
   #instructionScreen,
   #winScreen {
@@ -22,6 +24,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
   }
 
   #startScreen { display: flex; }
@@ -59,16 +63,17 @@
   #winScreen img {
     width: 500px;
     height: 500px;
+    z-index: 2;
   }
 
-  #instructionScreen .textBox,
-  #winScreen .textBox {
+  .textBox {
     background: rgba(255,255,255,0.85);
     padding: 20px;
     border-radius: 10px;
     max-width: 600px;
     font-size: 20px;
     margin-top: 20px;
+    z-index: 2;
   }
 
   #instructionScreen button {
@@ -79,6 +84,7 @@
     color: white;
     border: none;
     border-radius: 5px;
+    z-index: 2;
   }
 
   #gameScreen { 
@@ -94,6 +100,7 @@
 </head>
 <body>
 
+<!-- START SCREEN -->
 <div id="startScreen">
   <div id="startContent">
     <img src="frog.png" alt="Frog">
@@ -101,6 +108,7 @@
   </div>
 </div>
 
+<!-- INSTRUCTION SCREEN -->
 <div id="instructionScreen">
   <img src="frog.png" alt="Frog">
   <div class="textBox">
@@ -110,6 +118,7 @@
   <button onclick="beginGame()">Continue</button>
 </div>
 
+<!-- GAME SCREEN -->
 <div id="gameScreen">
   <div id="timerDisplay">Time: 0</div>
   <div id="puzzleArea">
@@ -118,10 +127,13 @@
   <button id="nextButton" onclick="goToNextLevel()">Next Puzzle</button>
 </div>
 
+<!-- WIN SCREEN -->
 <div id="winScreen">
-  <canvas id="fireworksCanvas" width="800" height="600" 
+  <canvas id="fireworksCanvas"
           style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+
   <img src="frog.png" alt="Frog">
+
   <div class="textBox">
     You should go check the path of the unknown for Kran.  
     He may know more about where Bill could be.
@@ -342,27 +354,33 @@ function enableDragAndDrop(size) {
 
   function endDrag(x, y) {
     if (draggedPiece) {
-      const col = Math.floor(x / (canvas.width / size));
-      const row = Math.floor(y / (canvas.height / size));
+        const originalRow = draggedPiece.currentRow;
+        const originalCol = draggedPiece.currentCol;
 
-      const targetPiece = getPieceAt(x, y);
+        const col = Math.floor(x / (canvas.width / size));
+        const row = Math.floor(y / (canvas.height / size));
 
-      if (targetPiece && !targetPiece.locked) {
-        [draggedPiece.currentRow, targetPiece.currentRow] =
-          [targetPiece.currentRow, draggedPiece.currentRow];
-        [draggedPiece.currentCol, targetPiece.currentCol] =
-          [targetPiece.currentCol, draggedPiece.currentCol];
-      } else if (!targetPiece) {
-        draggedPiece.currentRow = row;
-        draggedPiece.currentCol = col;
-      } else {
-        // target is locked: snap back (do nothing)
-      }
+        const targetPiece = getPieceAt(x, y);
 
-      lockCorrectPieces();
-      drawPuzzle();
-      checkCompletion();
-      draggedPiece = null;
+        if (targetPiece && !targetPiece.locked) {
+            [draggedPiece.currentRow, targetPiece.currentRow] =
+                [targetPiece.currentRow, draggedPiece.currentRow];
+            [draggedPiece.currentCol, targetPiece.currentCol] =
+                [targetPiece.currentCol, draggedPiece.currentCol];
+
+        } else if (!targetPiece) {
+            draggedPiece.currentRow = row;
+            draggedPiece.currentCol = col;
+
+        } else {
+            draggedPiece.currentRow = originalRow;
+            draggedPiece.currentCol = originalCol;
+        }
+
+        lockCorrectPieces();
+        drawPuzzle();
+        checkCompletion();
+        draggedPiece = null;
     }
   }
 
