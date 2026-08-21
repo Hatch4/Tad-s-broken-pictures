@@ -46,6 +46,7 @@
   canvas {
     background: white;
     border: 2px solid #333;
+    touch-action: none; /* Prevent scrolling on touch drag */
   }
 </style>
 </head>
@@ -65,7 +66,7 @@
 </div>
 
 <script>
-// Game levels configuration (all files in same folder as HTML)
+// Game levels configuration (now using .png files)
 const levels = [
   { img: 'image1.png', size: 2, time: 10 },
   { img: 'image2.png', size: 3, time: 35 },
@@ -84,12 +85,12 @@ let timer;
 let timeLeft;
 let failCount = [0, 0, 0, 0];
 
-// Sounds
+// Sounds (optional - ensure these files exist or remove these lines)
 const completionSounds = [
   new Audio("sound1.mp3"),
   new Audio("sound2.mp3"),
   new Audio("sound3.mp3"),
-  new Audio("Sound4.mp3")
+  new Audio("sound4.mp3")
 ];
 const failSound = new Audio("fail.mp3");
 
@@ -114,7 +115,7 @@ function createGrid(gridSize) {
   pieceSize = canvas.width / gridSize;
   pieces = [];
 
-  // Create puzzle pieces with correct positions
+  // Create puzzle pieces with random positions
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
       pieces.push({
@@ -128,12 +129,19 @@ function createGrid(gridSize) {
   }
 
   drawPuzzle();
+  enableDragAndDrop(gridSize);
 }
 
 function drawPuzzle() {
   const ctx = document.getElementById('gameCanvas').getContext('2d');
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
+  // Draw pond background first
+  const pond = new Image();
+  pond.src = 'pond.png';
+  ctx.drawImage(pond, 0, 0, ctx.canvas.width, ctx.canvas.height);
+
+  // Draw puzzle pieces
   pieces.forEach(piece => {
     ctx.drawImage(
       puzzleImage,
@@ -146,25 +154,44 @@ function drawPuzzle() {
 function enableDragAndDrop(gridSize) {
   const canvas = document.getElementById('gameCanvas');
 
-  canvas.onmousedown = (e) => {
+  // Mouse events
+  canvas.onmousedown = (e) => startDrag(e);
+  canvas.onmousemove = (e) => drag(e);
+  canvas.onmouseup = () => endDrag();
+
+  // Touch events
+  canvas.ontouchstart = (e) => {
+    e.preventDefault();
+    startDrag(e.touches[0]);
+  };
+  canvas.ontouchmove = (e) => {
+    e.preventDefault();
+    drag(e.touches[0]);
+  };
+  canvas.ontouchend = (e) => {
+    e.preventDefault();
+    endDrag();
+  };
+
+  function startDrag(e) {
     const pos = getMousePos(canvas, e);
     draggingPiece = getPieceAt(pos);
     if (draggingPiece && !draggingPiece.locked) {
       offsetX = pos.x - draggingPiece.x;
       offsetY = pos.y - draggingPiece.y;
     }
-  };
+  }
 
-  canvas.onmousemove = (e) => {
+  function drag(e) {
     if (draggingPiece && !draggingPiece.locked) {
       const pos = getMousePos(canvas, e);
       draggingPiece.x = pos.x - offsetX;
       draggingPiece.y = pos.y - offsetY;
       drawPuzzle();
     }
-  };
+  }
 
-  canvas.onmouseup = () => {
+  function endDrag() {
     if (draggingPiece && !draggingPiece.locked) {
       const correctX = draggingPiece.correctCol * pieceSize;
       const correctY = draggingPiece.correctRow * pieceSize;
@@ -178,32 +205,7 @@ function enableDragAndDrop(gridSize) {
       drawPuzzle();
     }
     draggingPiece = null;
-  };
-
-  canvas.onmousemove = (e) => {
-    if (draggingPiece && !draggingPiece.locked) {
-      const pos = getMousePos(canvas, e);
-      draggingPiece.x = pos.x - offsetX;
-      draggingPiece.y = pos.y - offsetY;
-      drawPuzzle();
-    }
-  };
-
-  canvas.onmouseup = () => {
-    if (draggingPiece && !draggingPiece.locked) {
-      const correctX = draggingPiece.correctCol * pieceSize;
-      const correctY = draggingPiece.correctRow * pieceSize;
-      if (Math.abs(draggingPiece.x - correctX) < 10 &&
-          Math.abs(draggingPiece.y - correctY) < 10) {
-        draggingPiece.x = correctX;
-        draggingPiece.y = correctY;
-        draggingPiece.locked = true;
-        checkCompletion(gridSize);
-      }
-      drawPuzzle();
-    }
-    draggingPiece = null;
-  };
+  }
 }
 
 function getMousePos(canvas, evt) {
@@ -280,30 +282,6 @@ document.addEventListener('keydown', e => {
     resetGame();
   }
 });
-
-// Enable drag-and-drop after grid creation
-function createGrid(gridSize) {
-  const ctx = document.getElementById('gameCanvas').getContext('2d');
-  const canvas = ctx.canvas;
-
-  pieceSize = canvas.width / gridSize;
-  pieces = [];
-
-  for (let row = 0; row < gridSize; row++) {
-    for (let col = 0; col < gridSize; col++) {
-      pieces.push({
-        correctRow: row,
-        correctCol: col,
-        x: Math.random() * (canvas.width - pieceSize),
-        y: Math.random() * (canvas.height - pieceSize),
-        locked: false
-      });
-    }
-  }
-
-  drawPuzzle();
-  enableDragAndDrop(gridSize);
-}
 </script>
 </body>
 </html>
