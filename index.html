@@ -48,7 +48,7 @@
 
 <div id="gameScreen">
   <div id="timerDisplay">Time: 0</div>
-  <canvas id="gameCanvas" width="400" height="400"></canvas>
+  <canvas id="gameCanvas" width="500" height="500"></canvas>
   <button id="nextButton" style="display:none; margin-top:10px;" onclick="goToNextLevel()">Next Puzzle</button>
 </div>
 <script>
@@ -61,11 +61,13 @@ const levels = [
 
 let currentLevel = 0;
 let pieces = [];
-let pieceSize;
+let pieceSize; // actual image piece size
 let puzzleImage = new Image();
 let timer;
 let timeLeft;
 let draggedPiece = null;
+let dragX = 0, dragY = 0;
+let dragOffsetX = 0, dragOffsetY = 0;
 let gameStartedOnce = false;
 let scrambleTimeout;
 let failCounts = {}; // Track fails per level
@@ -81,7 +83,6 @@ const completionSounds = [
   new Audio("sound4.mp3")
 ].map(s => { s.onerror = () => null; return s; });
 const failSound = new Audio("fail.mp3"); failSound.onerror = () => null;
-
 function startLevel(levelIndex) {
   if (!gameStartedOnce) {
     if (startSound) startSound.play();
@@ -103,7 +104,7 @@ function startLevel(levelIndex) {
 
 function createGrid(size) {
   const canvas = document.getElementById('gameCanvas');
-  pieceSize = canvas.width / size;
+  pieceSize = puzzleImage.width / size; // ✅ use actual image size
 
   pieces = [];
   for (let row = 0; row < size; row++) {
@@ -152,21 +153,41 @@ function lockCorrectPieces() {
 function drawFullImage() {
   const ctx = document.getElementById('gameCanvas').getContext('2d');
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  ctx.drawImage(puzzleImage, 0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.drawImage(
+    puzzleImage,
+    0, 0, puzzleImage.width, puzzleImage.height,
+    0, 0, ctx.canvas.width, ctx.canvas.height
+  );
 }
 
-function drawPuzzle() {
+function drawPuzzle(isDragging = false) {
   const ctx = document.getElementById('gameCanvas').getContext('2d');
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
+  const displayPieceSize = ctx.canvas.width / gridSize;
+
   pieces.forEach(piece => {
+    if (isDragging && piece === draggedPiece) return; // skip dragged piece
+
     ctx.drawImage(
       puzzleImage,
       piece.correctCol * pieceSize, piece.correctRow * pieceSize, pieceSize, pieceSize,
-      piece.currentCol * pieceSize, piece.currentRow * pieceSize, pieceSize, pieceSize
+      piece.currentCol * displayPieceSize, piece.currentRow * displayPieceSize, displayPieceSize, displayPieceSize
     );
-    ctx.strokeRect(piece.currentCol * pieceSize, piece.currentRow * pieceSize, pieceSize, pieceSize);
+    ctx.strokeRect(piece.currentCol * displayPieceSize, piece.currentRow * displayPieceSize, displayPieceSize, displayPieceSize);
   });
+
+  // Draw dragged piece on top
+  if (isDragging && draggedPiece) {
+    ctx.globalAlpha = 0.7;
+    ctx.drawImage(
+      puzzleImage,
+      draggedPiece.correctCol * pieceSize, draggedPiece.correctRow * pieceSize, pieceSize, pieceSize,
+      dragX - dragOffsetX, dragY - dragOffsetY, displayPieceSize, displayPieceSize
+    );
+    ctx.globalAlpha = 1.0;
+    ctx.strokeRect(dragX - dragOffsetX, dragY - dragOffsetY, displayPieceSize, displayPieceSize);
+  }
 }
 
 function enableDragAndDrop(size) {
@@ -187,12 +208,21 @@ function enableDragAndDrop(size) {
       draggedPiece = piece;
       draggedPiece.originalRow = piece.currentRow;
       draggedPiece.originalCol = piece.currentCol;
+
+      const displayPieceSize = canvas.width / size;
+      dragOffsetX = pos.x - piece.currentCol * displayPieceSize;
+      dragOffsetY = pos.y - piece.currentRow * displayPieceSize;
+      dragX = pos.x;
+      dragY = pos.y;
     }
   }
 
   function dragMove(e) {
     if (!draggedPiece) return;
-    // Optional: could add visual feedback here
+    const pos = getMousePos(canvas, e);
+    dragX = pos.x;
+    dragY = pos.y;
+    drawPuzzle(true);
   }
 
   function endDrag(e) {
@@ -201,12 +231,7 @@ function enableDragAndDrop(size) {
     const targetPiece = getPieceAtGrid(pos, size);
 
     if (targetPiece && targetPiece !== draggedPiece) {
-      if (targetPiece.locked) {
-        // Can't swap with a locked piece — snap back
-        draggedPiece.currentRow = draggedPiece.originalRow;
-        draggedPiece.currentCol = draggedPiece.originalCol;
-      } else {
-        // ✅ Proper swap: exchange positions
+      if (!targetPiece.locked) {
         const tempRow = targetPiece.currentRow;
         const tempCol = targetPiece.currentCol;
 
@@ -218,7 +243,7 @@ function enableDragAndDrop(size) {
       }
     }
 
-    // ✅ Lock dragged piece if correct
+    // Lock dragged piece if correct
     if (
       draggedPiece.currentRow === draggedPiece.correctRow &&
       draggedPiece.currentCol === draggedPiece.correctCol &&
@@ -228,7 +253,7 @@ function enableDragAndDrop(size) {
       if (successSound) successSound.play();
     }
 
-    // ✅ Lock target piece if correct after swap
+    // Lock target piece if correct
     if (
       targetPiece &&
       targetPiece.currentRow === targetPiece.correctRow &&
@@ -254,10 +279,11 @@ function getMousePos(canvas, evt) {
 }
 
 function getPieceAtGrid(pos, size) {
-  const col = Math.floor(pos.x / pieceSize);
-  const row = Math.floor(pos.y / pieceSize);
+  const col = Math.floor(pos.x / (canvas.width / size));
+  const row = Math.floor(pos.y / (canvas.height / size));
   return pieces.find(p => p.currentRow === row && p.currentCol === col);
 }
+
 function startTimer() {
   const { time } = levels[currentLevel];
   timeLeft = time;
