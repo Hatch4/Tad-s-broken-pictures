@@ -49,6 +49,7 @@
 <div id="gameScreen">
   <div id="timerDisplay">Time: 0</div>
   <canvas id="gameCanvas" width="400" height="400"></canvas>
+  <button id="nextButton" style="display:none; margin-top:10px;" onclick="goToNextLevel()">Next Puzzle</button>
 </div>
 <script>
 const levels = [
@@ -64,15 +65,24 @@ let pieceSize;
 let puzzleImage = new Image();
 let timer;
 let timeLeft;
+let draggedPiece = null;
 
 // Optional sounds (won’t break if missing)
-const completionSounds = [null, null, null, null];
-const failSound = null;
+const completionSounds = [
+  new Audio("sound1.mp3"),
+  new Audio("sound2.mp3"),
+  new Audio("sound3.mp3"),
+  new Audio("sound4.mp3")
+].map(s => { s.onerror = () => null; return s; });
+
+const failSound = new Audio("fail.mp3");
+failSound.onerror = () => null;
 
 function startLevel(levelIndex) {
   currentLevel = levelIndex;
   document.getElementById('startScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'flex';
+  document.getElementById('nextButton').style.display = 'none';
 
   const { img, size } = levels[levelIndex];
   puzzleImage.src = img;
@@ -130,30 +140,53 @@ function drawPuzzle() {
   pond.src = 'pond.png';
   ctx.drawImage(pond, 0, 0, ctx.canvas.width, ctx.canvas.height);
 
-  // Draw each piece in its current grid position
+  // Draw all pieces except the one being dragged
   pieces.forEach(piece => {
+    if (piece !== draggedPiece) {
+      ctx.drawImage(
+        puzzleImage,
+        piece.correctCol * pieceSize, piece.correctRow * pieceSize, pieceSize, pieceSize,
+        piece.currentCol * pieceSize, piece.currentRow * pieceSize, pieceSize, pieceSize
+      );
+      ctx.strokeRect(piece.currentCol * pieceSize, piece.currentRow * pieceSize, pieceSize, pieceSize);
+    }
+  });
+
+  // Draw dragged piece last so it overlaps others
+  if (draggedPiece) {
+    ctx.globalAlpha = 0.85;
     ctx.drawImage(
       puzzleImage,
-      piece.correctCol * pieceSize, piece.correctRow * pieceSize, pieceSize, pieceSize,
-      piece.currentCol * pieceSize, piece.currentRow * pieceSize, pieceSize, pieceSize
+      draggedPiece.correctCol * pieceSize, draggedPiece.correctRow * pieceSize, pieceSize, pieceSize,
+      draggedPiece.currentCol * pieceSize, draggedPiece.currentRow * pieceSize, pieceSize, pieceSize
     );
-    ctx.strokeRect(piece.currentCol * pieceSize, piece.currentRow * pieceSize, pieceSize, pieceSize);
-  });
+    ctx.strokeRect(draggedPiece.currentCol * pieceSize, draggedPiece.currentRow * pieceSize, pieceSize, pieceSize);
+    ctx.globalAlpha = 1.0;
+  }
 }
 
 function enableDragAndDrop(gridSize) {
   const canvas = document.getElementById('gameCanvas');
-  let draggedPiece = null;
 
   canvas.onmousedown = (e) => startDrag(e);
   canvas.onmouseup = (e) => endDrag(e);
+  canvas.onmousemove = (e) => dragMove(e);
 
   canvas.ontouchstart = (e) => startDrag(e.touches[0]);
   canvas.ontouchend = (e) => endDrag(e.changedTouches[0]);
+  canvas.ontouchmove = (e) => dragMove(e.touches[0]);
 
   function startDrag(e) {
     const pos = getMousePos(canvas, e);
     draggedPiece = getPieceAtGrid(pos, gridSize);
+  }
+
+  function dragMove(e) {
+    if (!draggedPiece) return;
+    const pos = getMousePos(canvas, e);
+    draggedPiece.currentCol = Math.floor(pos.x / pieceSize);
+    draggedPiece.currentRow = Math.floor(pos.y / pieceSize);
+    drawPuzzle();
   }
 
   function endDrag(e) {
@@ -162,13 +195,13 @@ function enableDragAndDrop(gridSize) {
     const targetPiece = getPieceAtGrid(pos, gridSize);
 
     if (targetPiece && targetPiece !== draggedPiece) {
-      // Swap positions
       [draggedPiece.currentRow, targetPiece.currentRow] = [targetPiece.currentRow, draggedPiece.currentRow];
+      [draggedPiece.currentCol, targetPiece.currentCol]
       [draggedPiece.currentCol, targetPiece.currentCol] = [targetPiece.currentCol, draggedPiece.currentCol];
     }
+    draggedPiece = null;
     drawPuzzle();
     checkCompletion();
-    draggedPiece = null;
   }
 }
 
@@ -197,12 +230,8 @@ function startTimer() {
     if (timeLeft <= 0) {
       clearInterval(timer);
       if (failSound) failSound.play();
-      alert("⏳ Time's up!");
-      if (currentLevel < levels.length - 1) {
-        startLevel(currentLevel + 1);
-      } else {
-        resetGame();
-      }
+      alert("⏳ Time's up! Try again.");
+      startLevel(currentLevel); // Restart same puzzle
     }
   }, 1000);
 }
@@ -212,13 +241,17 @@ function checkCompletion() {
   if (allCorrect) {
     clearInterval(timer);
     if (completionSounds[currentLevel]) completionSounds[currentLevel].play();
-    alert("✅ Puzzle Complete!");
-    if (currentLevel < levels.length - 1) {
-      startLevel(currentLevel + 1);
-    } else {
-      alert("🎉 All puzzles complete!");
-      resetGame();
-    }
+    document.getElementById('nextButton').style.display = 'inline-block';
+  }
+}
+
+function goToNextLevel() {
+  document.getElementById('nextButton').style.display = 'none';
+  if (currentLevel < levels.length - 1) {
+    startLevel(currentLevel + 1);
+  } else {
+    alert("🎉 All puzzles complete!");
+    resetGame();
   }
 }
 
