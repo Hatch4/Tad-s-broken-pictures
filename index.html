@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Image Unscramble Puzzle</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; background: #f0f0f0; }
+  #gameCanvas { background: #fff; border: 2px solid #333; display: block; margin: 20px auto; touch-action: none; }
+  #timer { font-size: 20px; margin: 10px; }
+  #nextBtn { display: none; padding: 10px 20px; font-size: 18px; margin-top: 10px; }
+  #clue { font-size: 18px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Image Unscramble Puzzle</h1>
+<div id="timer">Time: 0</div>
+<canvas id="gameCanvas" width="500" height="500"></canvas>
+<div id="clue"></div>
+<button id="nextBtn">Next</button>
+
+<script>
+// ======== CONFIG & VARIABLES ========
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const timerDisplay = document.getElementById('timer');
+const nextBtn = document.getElementById('nextBtn');
+const clueDisplay = document.getElementById('clue');
+let failCount = 0; // Track fails per level
+
+const levels = [
+  { img: 'image1.png', grid: 2, time: 10, clue: 'Clue from Image 1', sound: 'sound1.mp3' },
+  { img: 'image2.png', grid: 3, time: 35, clue: 'Clue from Image 2', sound: 'sound2.mp3' },
+  { img: 'image3.png', grid: 4, time: 50, clue: 'Clue from Image 3', sound: 'sound3.mp3' },
+  { img: 'image4.png', grid: 5, time: 75, clue: 'Clue from Image 4', sound: 'sound4.mp3' }
+];
+
+let currentLevel = 0;
+let pieces = [];
+let pieceSize;
+let draggingPiece = null;
+let offsetX, offsetY;
+let timer, timeLeft;
+let imgObj = new Image();
+
+// ======== LEVEL SETUP WITH PREVIEW ========
+function startLevel(levelIndex) {
+  currentLevel = levelIndex;
+  clueDisplay.textContent = '';
+  nextBtn.style.display = 'none';
+  imgObj.src = levels[levelIndex].img;
+  imgObj.onload = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imgObj, 0, 0, canvas.width, canvas.height);
+    timerDisplay.textContent = "Preview...";
+    setTimeout(() => {
+      setupPieces();
+      if (failCount < 2) {
+        startTimer(levels[levelIndex].time);
+      } else {
+        timerDisplay.textContent = "No Timer Mode";
+      }
+    }, 2000);
+  };
+}
+
+function setupPieces() {
+  const grid = levels[currentLevel].grid;
+  pieceSize = canvas.width / grid;
+  pieces = [];
+
+  for (let y = 0; y < grid; y++) {
+    for (let x = 0; x < grid; x++) {
+      pieces.push({
+        correctX: x * pieceSize,
+        correctY: y * pieceSize,
+        x: Math.random() * (canvas.width - pieceSize),
+        y: Math.random() * (canvas.height - pieceSize),
+        row: y,
+        col: x,
+        locked: false
+      });
+    }
+  }
+  drawPieces();
+}
+
+function drawPieces() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  pieces.forEach(p => {
+    ctx.drawImage(
+      imgObj,
+      p.col * pieceSize, p.row * pieceSize, pieceSize, pieceSize,
+      p.x, p.y, pieceSize, pieceSize
+    );
+    ctx.strokeRect(p.x, p.y, pieceSize, pieceSize);
+  });
+}
+
+  // ======== TIMER ========
+function startTimer(seconds) {
+  timeLeft = seconds;
+  timerDisplay.textContent = `Time: ${timeLeft}`;
+  clearInterval(timer);
+  timer = setInterval(() => {
+    timeLeft--;
+    timerDisplay.textContent = `Time: ${timeLeft}`;
+    if (timeLeft <= 0) {
+      clearInterval(timer);
+
+      // Play fail sound
+      let failAudio = new Audio('fail.mp3');
+      failAudio.play();
+
+      failCount++;
+
+      if (failCount >= 2) {
+        alert('Timer removed for this level so you can finish!');
+        startLevel(currentLevel); // Restart without timer
+      } else {
+        alert('Time up! Try again.');
+        startLevel(currentLevel);
+      }
+    }
+  }, 1000);
+}
+
+// ======== DRAG & DROP (Mouse + Touch) ========
+// Mouse events
+canvas.addEventListener('mousedown', e => startDrag(e));
+canvas.addEventListener('mousemove', e => dragMove(e));
+canvas.addEventListener('mouseup', () => endDrag());
+
+// Touch events
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  startDrag(e.touches[0]);
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  dragMove(e.touches[0]);
+});
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  endDrag();
+});
+
+function startDrag(e) {
+  const mousePos = getMousePos(e);
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    let p = pieces[i];
+    if (!p.locked &&
+        mousePos.x > p.x && mousePos.x < p.x + pieceSize &&
+        mousePos.y > p.y && mousePos.y < p.y + pieceSize) {
+      draggingPiece = p;
+      offsetX = mousePos.x - p.x;
+      offsetY = mousePos.y - p.y;
+      break;
+    }
+  }
+}
+
+function dragMove(e) {
+  if (draggingPiece) {
+    const mousePos = getMousePos(e);
+    draggingPiece.x = mousePos.x - offsetX;
+    draggingPiece.y = mousePos.y - offsetY;
+    drawPieces();
+  }
+}
+
+function endDrag() {
+  if (draggingPiece) {
+    if (Math.abs(draggingPiece.x - draggingPiece.correctX) < 10 &&
+        Math.abs(draggingPiece.y - draggingPiece.correctY) < 10) {
+      draggingPiece.x = draggingPiece.correctX;
+      draggingPiece.y = draggingPiece.correctY;
+      draggingPiece.locked = true;
+    }
+    draggingPiece = null;
+    drawPieces();
+    checkLevelComplete();
+  }
+}
+
+// ======== HELPER: Mouse/Touch Position ========
+function getMousePos(evt) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: evt.clientX - rect.left,
+    y: evt.clientY - rect.top
+  };
+}
+
+// ======== LEVEL COMPLETION ========
+function checkLevelComplete() {
+  if (pieces.every(p => p.locked)) {
+    clearInterval(timer);
+
+    // Reset fail count for next level
+    failCount = 0;
+
+    // Play the sound for this level
+    let audio = new Audio(levels[currentLevel].sound);
+    audio.play();
+
+    clueDisplay.textContent = levels[currentLevel].clue;
+    nextBtn.style.display = 'inline-block';
+  }
+}
+
+// ======== NEXT BUTTON ========
+nextBtn.addEventListener('click', () => {
+  if (currentLevel < levels.length - 1) {
+    startLevel(currentLevel + 1);
+  } else {
+    alert('🎉 Congratulations! You completed all puzzles!');
+    startLevel(0);
+  }
+});
+
+// ======== START GAME ========
+startLevel(0);
+</script>
+</body>
+</html>
+
+  
