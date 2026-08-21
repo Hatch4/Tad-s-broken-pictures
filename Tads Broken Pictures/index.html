@@ -5,7 +5,7 @@
 <title>Image Unscramble Puzzle</title>
 <style>
   body { font-family: Arial, sans-serif; text-align: center; background: #f0f0f0; }
-  #gameCanvas { background: #fff; border: 2px solid #333; display: block; margin: 20px auto; }
+  #gameCanvas { background: #fff; border: 2px solid #333; display: block; margin: 20px auto; touch-action: none; }
   #timer { font-size: 20px; margin: 10px; }
   #nextBtn { display: none; padding: 10px 20px; font-size: 18px; margin-top: 10px; }
   #clue { font-size: 18px; margin-top: 10px; }
@@ -50,15 +50,16 @@ function startLevel(levelIndex) {
   nextBtn.style.display = 'none';
   imgObj.src = levels[levelIndex].img;
   imgObj.onload = () => {
-    // Show completed image first
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(imgObj, 0, 0, canvas.width, canvas.height);
     timerDisplay.textContent = "Preview...";
-    
-    // Wait 2 seconds, then scramble and start timer
     setTimeout(() => {
       setupPieces();
-      startTimer(levels[levelIndex].time);
+      if (failCount < 2) {
+        startTimer(levels[levelIndex].time);
+      } else {
+        timerDisplay.textContent = "No Timer Mode";
+      }
     }, 2000);
   };
 }
@@ -96,13 +97,13 @@ function drawPieces() {
   });
 }
 
-// ======== TIMER ========
+  // ======== TIMER ========
 function startTimer(seconds) {
   timeLeft = seconds;
   timerDisplay.textContent = `Time: ${timeLeft}`;
   clearInterval(timer);
   timer = setInterval(() => {
-   timeLeft--;
+    timeLeft--;
     timerDisplay.textContent = `Time: ${timeLeft}`;
     if (timeLeft <= 0) {
       clearInterval(timer);
@@ -115,8 +116,7 @@ function startTimer(seconds) {
 
       if (failCount >= 2) {
         alert('Timer removed for this level so you can finish!');
-        // Restart level without timer
-        startLevelNoTimer(currentLevel);
+        startLevel(currentLevel); // Restart without timer
       } else {
         alert('Time up! Try again.');
         startLevel(currentLevel);
@@ -125,25 +125,27 @@ function startTimer(seconds) {
   }, 1000);
 }
 
-// ======== START LEVEL WITHOUT TIMER ========
-function startLevelNoTimer(levelIndex) {
-  currentLevel = levelIndex;
-  clueDisplay.textContent = '';
-  nextBtn.style.display = 'none';
-  imgObj.src = levels[levelIndex].img;
-  imgObj.onload = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(imgObj, 0, 0, canvas.width, canvas.height);
-    timerDisplay.textContent = "No Timer Mode";
-    setTimeout(() => {
-      setupPieces();
-      // No timer started here
-    }, 2000);
-  };
-}
+// ======== DRAG & DROP (Mouse + Touch) ========
+// Mouse events
+canvas.addEventListener('mousedown', e => startDrag(e));
+canvas.addEventListener('mousemove', e => dragMove(e));
+canvas.addEventListener('mouseup', () => endDrag());
 
-// ======== DRAG & DROP ========
-canvas.addEventListener('mousedown', e => {
+// Touch events
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  startDrag(e.touches[0]);
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  dragMove(e.touches[0]);
+});
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  endDrag();
+});
+
+function startDrag(e) {
   const mousePos = getMousePos(e);
   for (let i = pieces.length - 1; i >= 0; i--) {
     let p = pieces[i];
@@ -156,18 +158,18 @@ canvas.addEventListener('mousedown', e => {
       break;
     }
   }
-});
+}
 
-canvas.addEventListener('mousemove', e => {
+function dragMove(e) {
   if (draggingPiece) {
     const mousePos = getMousePos(e);
     draggingPiece.x = mousePos.x - offsetX;
     draggingPiece.y = mousePos.y - offsetY;
     drawPieces();
   }
-});
+}
 
-canvas.addEventListener('mouseup', () => {
+function endDrag() {
   if (draggingPiece) {
     if (Math.abs(draggingPiece.x - draggingPiece.correctX) < 10 &&
         Math.abs(draggingPiece.y - draggingPiece.correctY) < 10) {
@@ -179,9 +181,9 @@ canvas.addEventListener('mouseup', () => {
     drawPieces();
     checkLevelComplete();
   }
-});
+}
 
-// ======== HELPER: Mouse Position ========
+// ======== HELPER: Mouse/Touch Position ========
 function getMousePos(evt) {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -222,3 +224,5 @@ startLevel(0);
 </script>
 </body>
 </html>
+
+  
