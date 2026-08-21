@@ -212,6 +212,30 @@ function getPieceAt(x, y) {
 function enableDragAndDrop(size) {
   const canvas = document.getElementById('gameCanvas');
 
+  // Unified coordinate function for both mouse & touch
+  function getCanvasCoords(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    if (evt.touches && evt.touches.length > 0) {
+      return {
+        x: (evt.touches[0].clientX - rect.left) * scaleX,
+        y: (evt.touches[0].clientY - rect.top) * scaleY
+      };
+    } else if (evt.changedTouches && evt.changedTouches.length > 0) {
+      return {
+        x: (evt.changedTouches[0].clientX - rect.left) * scaleX,
+        y: (evt.changedTouches[0].clientY - rect.top) * scaleY
+      };
+    } else {
+      return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+      };
+    }
+  }
+
   function startDrag(x, y) {
     draggedPiece = getPieceAt(x, y);
     if (!draggedPiece || draggedPiece.locked) {
@@ -246,11 +270,11 @@ function enableDragAndDrop(size) {
         [draggedPiece.currentRow, targetPiece.currentRow] = [targetPiece.currentRow, draggedPiece.currentRow];
         [draggedPiece.currentCol, targetPiece.currentCol] = [targetPiece.currentCol, draggedPiece.currentCol];
       } else if (!targetPiece) {
-        // Empty space (if allowed)
+        // Move into empty space (if allowed)
         draggedPiece.currentRow = row;
         draggedPiece.currentCol = col;
       } else {
-        // Target is locked — snap back to original
+        // Target is locked — snap back to original position
       }
 
       lockCorrectPieces();
@@ -260,33 +284,35 @@ function enableDragAndDrop(size) {
     }
   }
 
-  // ================== TOUCH COORDINATE FIX ==================
-  function getCanvasCoords(touch, canvas) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return {
-      x: (touch.clientX - rect.left) * scaleX,
-      y: (touch.clientY - rect.top) * scaleY
-    };
-  }
-
   // Mouse events
-  canvas.onmousedown = e => startDrag(e.offsetX, e.offsetY);
-  canvas.onmousemove = e => moveDrag(e.offsetX, e.offsetY);
-  canvas.onmouseup = e => endDrag(e.offsetX, e.offsetY);
+  canvas.onmousedown = e => {
+    const pos = getCanvasCoords(e);
+    startDrag(pos.x, pos.y);
+  };
+  canvas.onmousemove = e => {
+    const pos = getCanvasCoords(e);
+    moveDrag(pos.x, pos.y);
+  };
+  canvas.onmouseup = e => {
+    const pos = getCanvasCoords(e);
+    endDrag(pos.x, pos.y);
+  };
 
-  // Touch events (with scaling fix)
+  // Touch events
   canvas.ontouchstart = e => {
-    const pos = getCanvasCoords(e.touches[0], canvas);
+    const pos = getCanvasCoords(e);
     startDrag(pos.x, pos.y);
   };
   canvas.ontouchmove = e => {
-    const pos = getCanvasCoords(e.touches[0], canvas);
+    const pos = getCanvasCoords(e);
     moveDrag(pos.x, pos.y);
   };
   canvas.ontouchend = e => {
-    const pos = getCanvasCoords(e.changedTouches
+    const pos = getCanvasCoords(e);
+    endDrag(pos.x, pos.y);
+  };
+}
+
 // ================== TIMER & LEVEL PROGRESSION ==================
 function startTimer() {
   timeLeft = levels[currentLevel].time;
