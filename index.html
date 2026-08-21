@@ -12,15 +12,19 @@
     margin: 0; 
   }
 
-  #startScreen {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+  #startScreen,
+  #instructionScreen,
+  #winScreen {
+    display: none;
     height: 100vh;
     background: url('pond.png') no-repeat center center;
     background-size: cover;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
+
+  #startScreen { display: flex; }
 
   #startContent {
     display: flex;
@@ -51,6 +55,32 @@
     background-color: #45a049;
   }
 
+  #instructionScreen img,
+  #winScreen img {
+    width: 500px;
+    height: 500px;
+  }
+
+  #instructionScreen .textBox,
+  #winScreen .textBox {
+    background: rgba(255,255,255,0.85);
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 600px;
+    font-size: 20px;
+    margin-top: 20px;
+  }
+
+  #instructionScreen button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 20px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+  }
+
   #gameScreen { 
     display: none; 
     flex-direction: column; 
@@ -71,12 +101,31 @@
   </div>
 </div>
 
+<div id="instructionScreen">
+  <img src="frog.png" alt="Frog">
+  <div class="textBox">
+    Help me fix my pictures! Slide the tiles into the correct position to continue to the next picture.
+    Remember you must be quick like a tadpole if you want to beat the timer.
+  </div>
+  <button onclick="beginGame()">Continue</button>
+</div>
+
 <div id="gameScreen">
   <div id="timerDisplay">Time: 0</div>
   <div id="puzzleArea">
     <canvas id="gameCanvas" width="500" height="500"></canvas>
   </div>
   <button id="nextButton" onclick="goToNextLevel()">Next Puzzle</button>
+</div>
+
+<div id="winScreen">
+  <canvas id="fireworksCanvas" width="800" height="600" 
+          style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+  <img src="frog.png" alt="Frog">
+  <div class="textBox">
+    You should go check the path of the unknown for Kran.  
+    He may know more about where Bill could be.
+  </div>
 </div>
 
 <script>
@@ -123,11 +172,18 @@ let dragX = 0, dragY = 0;
 let timer, timeLeft;
 let failCounts = [];
 let scrambleTimeout;
+let levelCompleted = false;
 
-// ================== START BUTTON HANDLER ==================
+// ================== START / INSTRUCTION ==================
 function playStartSoundAndBegin() {
   unlockAudio();
   playSound('start.mp3');
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('instructionScreen').style.display = 'flex';
+}
+
+function beginGame() {
+  document.getElementById('instructionScreen').style.display = 'none';
   startLevel(0);
 }
 
@@ -164,7 +220,11 @@ function drawPuzzle() {
 // ================== GAME SETUP ==================
 function startLevel(levelIndex) {
   currentLevel = levelIndex;
+  levelCompleted = false;
+
   document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('instructionScreen').style.display = 'none';
+  document.getElementById('winScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'flex';
   document.getElementById('nextButton').style.display = 'none';
 
@@ -288,11 +348,15 @@ function enableDragAndDrop(size) {
       const targetPiece = getPieceAt(x, y);
 
       if (targetPiece && !targetPiece.locked) {
-        [draggedPiece.currentRow, targetPiece.currentRow] = [targetPiece.currentRow, draggedPiece.currentRow];
-        [draggedPiece.currentCol, targetPiece.currentCol] = [targetPiece.currentCol, draggedPiece.currentCol];
+        [draggedPiece.currentRow, targetPiece.currentRow] =
+          [targetPiece.currentRow, draggedPiece.currentRow];
+        [draggedPiece.currentCol, targetPiece.currentCol] =
+          [targetPiece.currentCol, draggedPiece.currentCol];
       } else if (!targetPiece) {
         draggedPiece.currentRow = row;
         draggedPiece.currentCol = col;
+      } else {
+        // target is locked: snap back (do nothing)
       }
 
       lockCorrectPieces();
@@ -302,13 +366,31 @@ function enableDragAndDrop(size) {
     }
   }
 
-  canvas.onmousedown = e => startDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
-  canvas.onmousemove = e => moveDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
-  canvas.onmouseup = e => endDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
+  canvas.onmousedown = e => {
+    const pos = getCanvasCoords(e);
+    startDrag(pos.x, pos.y);
+  };
+  canvas.onmousemove = e => {
+    const pos = getCanvasCoords(e);
+    moveDrag(pos.x, pos.y);
+  };
+  canvas.onmouseup = e => {
+    const pos = getCanvasCoords(e);
+    endDrag(pos.x, pos.y);
+  };
 
-  canvas.ontouchstart = e => startDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
-  canvas.ontouchmove = e => moveDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
-  canvas.ontouchend = e => endDrag(getCanvasCoords(e).x, getCanvasCoords(e).y);
+  canvas.ontouchstart = e => {
+    const pos = getCanvasCoords(e);
+    startDrag(pos.x, pos.y);
+  };
+  canvas.ontouchmove = e => {
+    const pos = getCanvasCoords(e);
+    moveDrag(pos.x, pos.y);
+  };
+  canvas.ontouchend = e => {
+    const pos = getCanvasCoords(e);
+    endDrag(pos.x, pos.y);
+  };
 }
 
 // ================== TIMER & LEVEL PROGRESSION ==================
@@ -327,6 +409,8 @@ function startTimer() {
 }
 
 function handleLevelFail() {
+  if (levelCompleted) return;
+
   if (!failCounts[currentLevel]) failCounts[currentLevel] = 0;
   failCounts[currentLevel]++;
 
@@ -337,8 +421,11 @@ function handleLevelFail() {
 }
 
 function checkCompletion() {
+  if (levelCompleted) return;
+
   const allCorrect = pieces.every(p => p.locked);
   if (allCorrect) {
+    levelCompleted = true;
     clearInterval(timer);
 
     playSound(`sound${currentLevel + 1}.mp3`);
@@ -347,14 +434,86 @@ function checkCompletion() {
   }
 }
 
+// ================== FIREWORKS & WIN SCREEN ==================
+function startFireworks() {
+    const canvas = document.getElementById('fireworksCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let particles = [];
+
+    function spawnFirework() {
+        const x = Math.random() * canvas.width;
+        const y = canvas.height;
+        const speed = 5 + Math.random() * 3;
+        const color = `hsl(${Math.random()*360},100%,50%)`;
+
+        particles.push({
+            x, y,
+            vx: (Math.random() - 0.5) * 2,
+            vy: -speed,
+            color,
+            exploded: false,
+            children: []
+        });
+    }
+
+    function update() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        particles.forEach(p => {
+            if (!p.exploded) {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.1;
+
+                if (p.vy > 0) {
+                    p.exploded = true;
+                    for (let i = 0; i < 30; i++) {
+                        p.children.push({
+                            x: p.x,
+                            y: p.y,
+                            vx: (Math.random() - 0.5) * 6,
+                            vy: (Math.random() - 0.5) * 6,
+                            life: 40,
+                            color: p.color
+                        });
+                    }
+                }
+
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 4, 4);
+            }
+
+            p.children.forEach(c => {
+                c.x += c.vx;
+                c.y += c.vy;
+                c.vy += 0.05;
+                c.life--;
+
+                ctx.fillStyle = c.color;
+                ctx.fillRect(c.x, c.y, 3, 3);
+            });
+
+            p.children = p.children.filter(c => c.life > 0);
+        });
+
+        particles = particles.filter(p => p.children.length > 0 || !p.exploded);
+
+        requestAnimationFrame(update);
+    }
+
+    setInterval(spawnFirework, 500);
+    update();
+}
+
 function goToNextLevel() {
   currentLevel++;
   if (currentLevel < levels.length) {
     startLevel(currentLevel);
   } else {
-    alert("🎉 Congratulations! You completed all puzzles!");
-    document.getElementById('startScreen').style.display = 'flex';
     document.getElementById('gameScreen').style.display = 'none';
+    document.getElementById('winScreen').style.display = 'flex';
+    startFireworks();
   }
 }
 </script>
