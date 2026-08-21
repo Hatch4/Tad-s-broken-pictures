@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <title>Broken Pictures Puzzle</title>
 <style>
-  body { font-family: sans-serif; text-align: center; background: #f0f0f0; }
+  body { font-family: sans-serif; text-align: center; background: #f0f0f0; margin: 0; }
   #gameScreen { display: none; flex-direction: column; align-items: center; }
   #puzzleArea { margin-top: 10px; }
-  canvas { background: #ddd; touch-action: none; }
+  canvas { background: #ddd; touch-action: none; max-width: 95vw; height: auto; }
   #nextButton { margin-top: 10px; padding: 8px 16px; font-size: 16px; }
 </style>
 </head>
@@ -29,10 +29,10 @@
 <script>
 // ================== GAME VARIABLES ==================
 let levels = [
-  { img: 'image1.jpg', size: 2, time: 10 },
-  { img: 'image2.jpg', size: 3, time: 35 },
-  { img: 'image3.jpg', size: 4, time: 50 },
-  { img: 'image4.jpg', size: 5, time: 75 }
+  { img: 'image1.png', size: 2, time: 10 },
+  { img: 'image2.png', size: 3, time: 35 },
+  { img: 'image3.png', size: 4, time: 50 },
+  { img: 'image4.png', size: 5, time: 75 }
 ];
 let currentLevel = 0;
 let puzzleImage = new Image();
@@ -41,10 +41,6 @@ let draggedPiece = null, dragOffsetX = 0, dragOffsetY = 0, dragX = 0, dragY = 0;
 let timer, timeLeft;
 let failCounts = [];
 let scrambleTimeout;
-let successSound = null; // Optional: new Audio('success.mp3');
-let failSound = null;    // Optional: new Audio('fail.mp3');
-let completionSounds = []; // Optional: [new Audio('level1.mp3'), ...]
-
 // ================== DRAWING FUNCTIONS ==================
 function drawFullImage() {
   const canvas = document.getElementById('gameCanvas');
@@ -125,7 +121,6 @@ function createGrid(size) {
     }
   }, 2000);
 }
-
 // ================== PUZZLE HELPERS ==================
 function shufflePieces() {
   for (let i = pieces.length - 1; i > 0; i--) {
@@ -147,39 +142,32 @@ function getPieceAt(x, y) {
   return pieces.find(p => p.currentRow === row && p.currentCol === col);
 }
 
-// ================== DRAG & DROP ==================
+// ================== DRAG & DROP (Mouse + Touch) ==================
 function enableDragAndDrop(size) {
   const canvas = document.getElementById('gameCanvas');
 
-  canvas.onmousedown = e => {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  function startDrag(x, y) {
     draggedPiece = getPieceAt(x, y);
     if (draggedPiece && !draggedPiece.locked) {
       dragOffsetX = x - draggedPiece.currentCol * (canvas.width / size);
       dragOffsetY = y - draggedPiece.currentRow * (canvas.height / size);
     }
-  };
+  }
 
-  canvas.onmousemove = e => {
+  function moveDrag(x, y) {
     if (draggedPiece) {
-      const rect = canvas.getBoundingClientRect();
-      dragX = e.clientX - rect.left - dragOffsetX;
-      dragY = e.clientY - rect.top - dragOffsetY;
+      dragX = x - dragOffsetX;
+      dragY = y - dragOffsetY;
       drawPuzzle();
       const ctx = canvas.getContext('2d');
       const sx = draggedPiece.correctCol * pieceSize;
       const sy = draggedPiece.correctRow * pieceSize;
       ctx.drawImage(puzzleImage, sx, sy, pieceSize, pieceSize, dragX, dragY, canvas.width / size, canvas.height / size);
     }
-  };
+  }
 
-  canvas.onmouseup = e => {
+  function endDrag(x, y) {
     if (draggedPiece) {
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
       const targetPiece = getPieceAt(x, y);
       if (targetPiece && targetPiece !== draggedPiece) {
         [draggedPiece.currentRow, targetPiece.currentRow] = [targetPiece.currentRow, draggedPiece.currentRow];
@@ -190,9 +178,42 @@ function enableDragAndDrop(size) {
       checkCompletion();
       draggedPiece = null;
     }
+  }
+
+  // Mouse events
+  canvas.onmousedown = e => {
+    const rect = canvas.getBoundingClientRect();
+    startDrag(e.clientX - rect.left, e.clientY - rect.top);
+  };
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    moveDrag(e.clientX - rect.left, e.clientY - rect.top);
+  };
+  canvas.onmouseup = e => {
+    const rect = canvas.getBoundingClientRect();
+    endDrag(e.clientX - rect.left, e.clientY - rect.top);
+  };
+
+  // Touch events
+  canvas.ontouchstart = e => {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    startDrag(touch.clientX - rect.left, touch.clientY - rect.top);
+    e.preventDefault();
+  };
+  canvas.ontouchmove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    moveDrag(touch.clientX - rect.left, touch.clientY - rect.top);
+    e.preventDefault();
+  };
+  canvas.ontouchend = e => {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.changedTouches[0];
+    endDrag(touch.clientX - rect.left, touch.clientY - rect.top);
+    e.preventDefault();
   };
 }
-
 // ================== TIMER & LEVEL PROGRESSION ==================
 function startTimer() {
   timeLeft = levels[currentLevel].time;
@@ -211,11 +232,7 @@ function startTimer() {
 function handleLevelFail() {
   if (!failCounts[currentLevel]) failCounts[currentLevel] = 0;
   failCounts[currentLevel]++;
-  if (failSound) {
-    failSound.currentTime = 0;
-    failSound.play();
-  }
-  alert("Time's up! Try again.");
+  alert("⏳ Time's up! Try again.");
   startLevel(currentLevel);
 }
 
@@ -223,19 +240,6 @@ function checkCompletion() {
   const allCorrect = pieces.every(p => p.locked);
   if (allCorrect) {
     clearInterval(timer);
-
-    // Stop success sound before playing completion sound
-    if (successSound && !successSound.paused) {
-      successSound.pause();
-      successSound.currentTime = 0;
-    }
-
-    // Play level completion sound if available
-    if (completionSounds[currentLevel]) {
-      completionSounds[currentLevel].currentTime = 0;
-      completionSounds[currentLevel].play();
-    }
-
     document.getElementById('nextButton').style.display = 'inline-block';
   }
 }
