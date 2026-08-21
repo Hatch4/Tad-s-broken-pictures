@@ -214,10 +214,12 @@ function enableDragAndDrop(size) {
 
   function startDrag(x, y) {
     draggedPiece = getPieceAt(x, y);
-    if (draggedPiece && !draggedPiece.locked) {
-      dragOffsetX = x - draggedPiece.currentCol * (canvas.width / size);
-      dragOffsetY = y - draggedPiece.currentRow * (canvas.height / size);
+    if (!draggedPiece || draggedPiece.locked) {
+      draggedPiece = null; // Prevent dragging locked pieces
+      return;
     }
+    dragOffsetX = x - draggedPiece.currentCol * (canvas.width / size);
+    dragOffsetY = y - draggedPiece.currentRow * (canvas.height / size);
   }
 
   function moveDrag(x, y) {
@@ -237,14 +239,19 @@ function enableDragAndDrop(size) {
       const col = Math.floor(x / (canvas.width / size));
       const row = Math.floor(y / (canvas.height / size));
 
-      // Swap positions
       const targetPiece = getPieceAt(x, y);
+
       if (targetPiece && !targetPiece.locked) {
+        // Swap positions
         [draggedPiece.currentRow, targetPiece.currentRow] = [targetPiece.currentRow, draggedPiece.currentRow];
         [draggedPiece.currentCol, targetPiece.currentCol] = [targetPiece.currentCol, draggedPiece.currentCol];
-      } else {
+      } else if (!targetPiece) {
+        // Empty space (if allowed)
         draggedPiece.currentRow = row;
         draggedPiece.currentCol = col;
+      } else {
+        // Target is locked — snap back to original
+        // No change to draggedPiece position
       }
 
       lockCorrectPieces();
@@ -276,6 +283,7 @@ function enableDragAndDrop(size) {
     endDrag(touch.clientX - rect.left, touch.clientY - rect.top);
   };
 }
+
 // ================== TIMER & LEVEL PROGRESSION ==================
 function startTimer() {
   timeLeft = levels[currentLevel].time;
